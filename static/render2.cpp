@@ -95,6 +95,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	float pos  = 1 - *min;
 	if(pos < 0)
 		pos = 0;
+	else if (pos > 1)
+		pos = 1;
 	if(gGate)
 	{
 		if(pos < gGatePosThresholdOff)
