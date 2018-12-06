@@ -436,8 +436,7 @@ void Bela_userSettings(BelaInitSettings* settings)
 bool setup2(BelaContext* context, void* userData);
 bool setup(BelaContext* context, void* userData)
 {
-    setup2(context, userData);
-    int nvoices;
+    int nvoices = 1;
     mydsp_poly* dsp_poly = NULL;
     
 #ifdef NVOICES
@@ -503,7 +502,7 @@ bool setup(BelaContext* context, void* userData)
     if (dsp_poly) dsp_poly->setGroup(group);
 #endif
     
-    return true;
+    return setup2(context, userData);
 }
 
 void render2(BelaContext* context, void* userData);
