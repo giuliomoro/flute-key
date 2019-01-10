@@ -10,12 +10,12 @@ import("instruments.lib");
 
 //==================== GUI SPECIFICATION ================
 
-freq = nentry("h:Basic_Parameters/freq [1][unit:Hz] [tooltip:Tone frequency][BELA:KEY]",440,116.5409,2000,1);
-gain = nentry("h:Basic_Parameters/gain [1][tooltip:Gain (value between 0 and 1)]",0.9,0,1,0.01);
+freq = hslider("h:Basic_Parameters/freq [1][unit:Hz] [tooltip:Tone frequency][BELA:KEY]",440,116.5409,2000,1);
+gain = nentry("h:Basic_Parameters/gain [1][tooltip:Gain (value between 0 and 1)]",0.5,0,1,0.01);
 gate = checkbox("h:Basic_Parameters/gate [1][tooltip:noteOn = 1, noteOff = 0][BELA:GATE]") : int;
 
 pressure = hslider("h:Physical_and_Nonlinearity/v:Physical_Parameters/Pressure 
-[2][tooltip:Breath pressure (value bewteen 0 and 1)][BELA:POS]",0.9,0,1.5,0.01) : si.smoo;
+[2][tooltip:Breath pressure (value bewteen 0 and 1)][BELA:POS]",0.9,0,1.6,0.01) : si.smooth(0.9);
 breathAmp = hslider("h:Physical_and_Nonlinearity/v:Physical_Parameters/Noise Gain 
 [2][tooltip:Breath noise gain (value between 0 and 1)][BELA:PERC]",0.1,0.05,0.8,0.01)/10;
 
@@ -54,6 +54,7 @@ env2Attack = hslider("h:Envelopes_and_Vibrato/v:Global_Envelope_Parameters/Glob_
 [6][unit:s][tooltip:Global envelope attack duration]",0.04,0,2,0.01);
 env2Release = hslider("h:Envelopes_and_Vibrato/v:Global_Envelope_Parameters/Glob_Env_Release 
 [6][unit:s][tooltip:Global envelope release duration]",0.1,0,2,0.01);
+embRatio = hslider("embouchure ratio", 1.0, 1.0, 8.0, 0.01);
 
 //==================== SIGNAL PROCESSING ================
 
@@ -78,7 +79,7 @@ feedBack1 = 0.4;
 feedBack2 = 0.4;
 
 //Delay Lines
-embouchureDelayLength = (ma.SR/freq)/2-2;
+embouchureDelayLength = (ma.SR/freq)/2 / embRatio -2;
 boreDelayLength = ma.SR/freq-2;
 embouchureDelay = de.fdelay(4096,embouchureDelayLength);
 boreDelay = de.fdelay(4096,boreDelayLength);
