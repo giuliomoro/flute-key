@@ -1,6 +1,5 @@
 #include <Bela.h>
 #include <Keys.h>
-
 #include <algorithm>
 #include <cmath>
 extern float gKey;
@@ -8,19 +7,20 @@ extern float gPos;
 extern float gGate;
 extern float gPerc;
 extern float gAux;
-#ifdef SCOPE
-#include <Scope/Scope.h>
-Scope scope;
-#endif /* SCOPE */
 
+#define SCOPE
 #define SCANNER
 //#define LOG_KEYS_AUDIO
 #define FEATURE
-
+#define KEYPOSITIONTRACKER
 //#define PIEZOS
 //#define LOWPASS_PIEZOS
 //#define DELAY_INPUTS
 
+#ifdef SCOPE
+#include <Scope.h>
+Scope scope;
+#endif /* SCOPE */
 #ifdef SCANNER
 #include <Keys.h>
 Keys* keys;
@@ -34,6 +34,12 @@ float gGatePosThresholdOff = 0.1;
 #include "KeyFeature.h"
 KeyFeature keyFeature;
 #endif /* FEATURE */
+#ifdef KEYPOSITIONTRACKER
+#include "KeyPositionTracker.h"
+KeyBuffers keyBuffers;
+std::vector<KeyBuffer> keyBuffer;
+std::vector<KeyPositionTracker> keyPositionTrackers;
+#endif /* KEYPOSITIONTRACKER */
 #else /* SCANNER */
 #undef LOG_KEYS_AUDIO
 #undef FEATURE
@@ -68,28 +74,57 @@ void Bela_userSettings2(BelaInitSettings* settings)
 {
 	settings->pruNumber = 0;	
 	settings->useDigital = 0;
+	printf("Bela__user_settings2\n");
 }
 
 #ifndef LOG_KEYS_AUDIO
 void postCallback(void* arg, float* buffer, unsigned int length){
 	Keys* keys = (Keys*)arg;
+	unsigned int key = gKeyOffset + 13;
 #ifdef FEATURE
 	KeyFeature::postCallback((void*)&keyFeature, buffer, length);
 #endif /* FEATURE */
+#ifdef KEYPOSITIONTRACKER
+	{
+		static int count;
+		keyBuffers.postCallback(buffer, length);
+		for(unsigned int n = 0; n < length; ++n)
+		{
+			if(n >= 45 && n < 82)
+			{
+				keyPositionTrackers[n].triggerReceived(count);
+			}
+		}
+		count++;
+	}
+#endif /* KEYPOSITIONTRACKER */
 	
 	static float oldVal;
-	static float oldVal2;
-	unsigned int key = gKeyOffset + 1;
-	unsigned int key2 = gKeyOffset + 2;
 	float val = keys->getNoteValue(key);
-	float val2 = keys->getNoteValue(key2);
 #ifdef FEATURE
-	float feature = keyFeature.percussiveness[key].getFeature();
-	float feature2 = keyFeature.percussiveness[key2].getFeature();
-#ifdef SCOPE
-	scope.log(val, (val - oldVal), feature, 0, 0, 0, 0, 0);
-#endif /* SCOPE */
+	static float feature;
+	feature = keyFeature.percussiveness[key].getFeature();
+#ifdef KEYPOSITIONTRACKER
+	static float feature3;
+	// use state machine from KeyPositionTracker to gate feature update
+	int state = keyPositionTrackers[key].currentState();
+	bool shouldUpdate = 
+		(state != kPositionTrackerStateDown)
+		&& (state != kPositionTrackerStateReleaseInProgress)
+		&& (state != kPositionTrackerStateReleaseFinished);
+	feature3 = state /(float) kPositionTrackerStateReleaseFinished;
+	//if(shouldUpdate)
+#endif /* KEYPOSITIONTRACKER */
 #endif /* FEATURE */
+#ifdef KEYPOSITIONTRACKER
+	float feature2 = keyPositionTrackers[key].pressPercussiveness().percussiveness;
+	feature2 -= 0.02;
+	feature2 *= 15;
+	feature2 = feature2 < 0 ? 0 : feature2;
+#endif /* KEYPOSITIONTRACKER */
+#ifdef SCOPE
+	scope.log(1.f-val, feature, feature2, -feature3);
+#endif /* SCOPE */
 	float* start = buffer + gKeyOffset;
 	float* min = std::min_element(start, start + gNumKeys);
 	float pos  = 1 - *min;
@@ -108,6 +143,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	gPos = pos;
 	int keyOne = min - buffer;
 	float keyFloat = keyOne;
+#ifdef FEATURE
 	static float perc;
 	static float smoothedPerc;
 	static float lastTrigPerc;
@@ -150,13 +186,13 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		smoothedPerc *= 0.99;
 	}
 	gPerc = smoothedPerc;
-	float auxNorm = 0.15;
-	float maxAux = 0.12;
-	float aux = auxNorm - smoothedPerc;
-	aux /= auxNorm;
+	float percussNorm = 0.15;
+	float auxRange = 0.3;
+	float auxMin = 0;
+	float aux = smoothedPerc > 0.1;
 	aux = aux < 0 ? 0 : aux;
 	aux = aux > 1 ? 1 : aux;
-	gAux = aux * maxAux;
+	gAux = aux * auxRange + auxMin;
 
 	if(gGate)
 		gKey = keyFloat - gKeyOffset;
@@ -169,7 +205,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	}
 	//scope.log(val, (val - oldVal), val2, (val2 - oldVal2), feature, feature2, 0, 0);
 	oldVal = val;
-	oldVal2 = val2;
+#endif /* FEATURE */
 }
 #endif /* LOG_KEYS_AUDIO */
 #else
@@ -183,7 +219,7 @@ bool setup2(BelaContext *context, void *userData)
 #ifdef LOG_KEYS_AUDIO
 	scope.setup(4, context->audioSampleRate);
 #else /* LOG_KEYS_AUDIO */
-	scope.setup(8, 1000);
+	scope.setup(4, 1000);
 #endif /* LOG_KEYS_AUDIO */
 #endif /* SCOPE */
 #ifdef LOWPASS_PIEZOS
@@ -218,6 +254,26 @@ bool setup2(BelaContext *context, void *userData)
 #ifdef FEATURE
 	keyFeature.setup(bt.getNumNotes(), 500);
 #endif /* FEATURE */
+#ifdef KEYPOSITIONTRACKER
+	int bottomKey = bt.getLowestNote();
+	int topKey = bt.getHighestNote();
+	int numKeys = topKey - bottomKey + 1;
+	keyBuffers.setup(numKeys, 1000);
+	keyBuffer.reserve(numKeys); // avoid reallocation in the loop below
+	for(unsigned int n = 0; n < numKeys; ++n)
+	{
+		keyBuffer.emplace_back(
+			keyBuffers.positionBuffer[n],
+			keyBuffers.timestamps[n],
+			keyBuffers.firstSampleIndex,
+			keyBuffers.writeIdx
+		);
+		keyPositionTrackers.emplace_back(
+				10, keyBuffer[n]
+				);
+		keyPositionTrackers.back().engage();
+	}
+#endif /* KEYPOSITIONTRACKER */
 #ifndef LOG_KEYS_AUDIO
 	keys->setPostCallback(postCallback, keys);
 #endif /* LOG_KEYS_AUDIO */
@@ -229,7 +285,7 @@ bool setup2(BelaContext *context, void *userData)
 		keys = NULL;
 	}
 	keys->startTopCalibration();
-	keys->loadLinearCalibrationFile("/root/spi-pru/calib.out");
+	keys->loadInverseSquareCalibrationFile("/root/out.calib", 0);
 #endif /* SCANNER */
 	return true;
 }
@@ -264,7 +320,7 @@ void render2(BelaContext *context, void *userData)
 			gInputDelayBuffers[i][gInputDelayIdx] = piezoInput;
 #endif /* PIEZOS */
 #ifdef SCOPE
-#if (defined SCANNER && defined PIEZOS && LOG_KEYS_AUDIO)
+#if (defined SCANNER && defined PIEZOS && defined LOG_KEYS_AUDIO)
 			if(i == 0)
 				scope.log(input, keys->getNoteValue(gKeyOffset + i));
 #endif /* SCANNER && PIEZOS */
@@ -278,8 +334,5 @@ void cleanup2(BelaContext *context, void *userData)
 #ifdef SCANNER
 	delete keys;
 #endif /* SCANNER */
-#ifdef SCOPE
-	delete scope;
-#endif /* SCOPE */
 
 }
