@@ -1,0 +1,8 @@
+#N canvas 0 22 450 300 10;
+#X obj 173 123 snapshot~;
+#X obj 37 68 r sampleme;
+#X obj 188 76 inlet~;
+#X obj 180 169 outlet;
+#X connect 0 0 3 0;
+#X connect 1 0 0 0;
+#X connect 2 0 0 0;
