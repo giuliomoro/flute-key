@@ -85,7 +85,9 @@ embouchureDelay = de.fdelay(4096,embouchureDelayLength);
 boreDelay = de.fdelay(4096,boreDelayLength);
 
 //Polinomial
-poly = _ <: _ - _*_*_;
+clipAt = 30;
+clip(s) = s:min(clipAt) : max(-clipAt);
+poly = clip(_ <: _ - _*_*_);
 
 //jet filter is a lowpass filter (declared in miscfilter.lib)
 reflexionFilter = fi.lowpass(1,2000);
