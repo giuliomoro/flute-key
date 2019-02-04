@@ -85,16 +85,23 @@ embouchureDelay = de.fdelay(4096,embouchureDelayLength);
 boreDelay = de.fdelay(4096,boreDelayLength);
 
 //Polinomial
-clipAt = 30;
+//clipAt = 1/feedBack1;
+clipAt = 5;
 clip(s) = s:min(clipAt) : max(-clipAt);
 poly = clip(_ <: _ - _*_*_);
 
 //jet filter is a lowpass filter (declared in miscfilter.lib)
 reflexionFilter = fi.lowpass(1,2000);
 
-//stereoizer is declared in instruments.lib and implement a stereo spacialisation in function of 
-//the frequency period in number of samples 
-stereo = stereoizer(ma.SR/freq);
+// fractional delay version of stereoizer from instruments.lib
+fstereoizer(periodDuration) = _ <: _,widthdelay : stereopanner
+    with {
+        W = hslider("v:Spat/spatial width", 0.5, 0, 1, 0.01);
+        A = hslider("v:Spat/pan angle", 0.6, 0, 1, 0.01);
+        widthdelay = de.fdelay(4096,W*periodDuration/2);
+        stereopanner = _,_ : *(1.0-A), *(A);
+    };
+stereo = fstereoizer(ma.SR/freq);
 
 //----------------------- Algorithm implementation ----------------------------
 
