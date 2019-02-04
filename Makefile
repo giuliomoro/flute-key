@@ -14,3 +14,8 @@ all: $(BUILD_DIR)/render.cpp
 $(BUILD_DIR)/render.cpp: $(DSP_FILE) faust/architecture/bela.cpp
 	@echo RUNNING FAUST
 	ARCHFILE="$(ARCHFILE)" faust2bela -gui $(DSP_FILE)
+
+clean:
+	ssh root@192.168.7.2 make -C Bela PROJECT=$(BUILD_DIR) clean
+	rm -rf $(BUILD_DIR)
+
