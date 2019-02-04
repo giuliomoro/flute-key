@@ -58,11 +58,18 @@ const std::array<std::string, kPositionTrackerStateReleaseFinished + 1> statesDe
 }};
 
 // Constants for key state detection
-const key_position kPositionTrackerPressPosition = scale_key_position(0.75);
-const key_position kPositionTrackerPressHysteresis = scale_key_position(0.05);
-const key_position kPositionTrackerMinMaxSpacingThreshold = scale_key_position(0.02);
-const key_position kPositionTrackerFirstMaxThreshold = scale_key_position(0.075);
+constexpr key_position kPositionTrackerPressPosition = scale_key_position(0.75);
+constexpr key_position kPositionTrackerPressHysteresis = scale_key_position(0.05);
+const key_position kPositionTrackerMinMaxSpacingThreshold = scale_key_position(0.002);
+const key_position kPositionTrackerFirstMaxThreshold = scale_key_position(0.02);
+//const key_position kPositionTrackerFirstMaxThreshold = scale_key_position(0.02);
 const key_position kPositionTrackerReleaseFinishPosition = scale_key_position(0.2);
+const key_position kPositionTrackerOnsetStartPositionMax = scale_key_position(0.3);
+constexpr float kPositionTrackerMaxCoefficientForNewPress = 1.1;
+const key_position kPositionTrackerReleaseMaxysteresis = scale_key_position(0.003);
+const key_position kPositionTrackerReleaseInitialMax = scale_key_position(0.4);
+const key_position kPositionTrackerReleaseMinDynamicOnsetThreshold = scale_key_position(0.02);
+const key_position kPositionTrackerPeakInstantaneousVelocityMinThreshold = scale_key_position(0.005);
 
 // How far back to search at the beginning to find the real start or release of a key press
 const int kPositionTrackerSamplesToSearchForStartLocation = 50;
@@ -201,9 +208,11 @@ public:
         float percussiveness;                   // Calculated single feature based on everything below
         Event velocitySpikeMaximum;             // Maximum and minimum points of the initial
         Event velocitySpikeMinimum;             // velocity spike on a percussive press
+	float velocityAverageAroundSpike;       // velocity spike on a percussive press
         timestamp_type timeFromStartToSpike;    // How long it took to reach the velocity spike
         key_velocity areaPrecedingSpike;        // Total sum of velocity values from start to max
         key_velocity areaFollowingSpike;        // Total sum of velocity values from max to min
+        bool hasBeenRead;
     };
     
 public:
@@ -338,6 +347,13 @@ private:
     timestamp_type releaseEndTimestamp_;                        // Timestamp of where the key release ended
     key_buffer_index releaseEndIndex_;                          // Index in the buffer of where the key release ended
     key_position currentMinPosition_, currentMaxPosition_;      // Running min and max key position
+public: // public for debugging
+    key_position releaseMaxPosition_;                    // Keeps track of the bounces during release
+    timestamp_type releaseMaxTimestamp_;                 // Keeps track of the bounces during release
+    timestamp_type releaseFinishedTimestamp_;                   // When did the release finish?
+    key_position releaseFinishedPosition_; // what position when we detected release finished
+    key_position dynamicOnsetThreshold_; // not needed internally, but useful for debugging
+private:
     timestamp_type currentMinTimestamp_, currentMaxTimestamp_;  // Times for the above positions
     key_buffer_index currentMinIndex_, currentMaxIndex_;        // Indices in the buffer for the recent min/max
     key_position lastMinMaxPosition_;                           // Position of the last significant point
@@ -385,6 +401,9 @@ private:
     bool empty_;
     bool empty() {return empty_;};
     void insert(KeyPositionTrackerNotification notification, timestamp_type timestamp);
+    PercussivenessFeatures percussivenessFeatures_;
+public:
+    Event getPercussiveness();
 };
 
 
