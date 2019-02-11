@@ -11,6 +11,10 @@ all: $(BUILD_DIR)/render.cpp
 	rsync -a $(STATIC_DIR)/* $(BUILD_DIR)/
 	BELA_EXPERT_MODE=1 ../Bela/scripts/build_project.sh --force -m "'LDLIBS=$(BELA_LDLIBS)' 'CPPFLAGS=$(BELA_CPPFLAGS)'" -c "$(BELA_COMMAND_ARGS)" $(BUILD_DIR) 
 
+build: $(BUILD_DIR)/render.cpp
+	rsync -a $(STATIC_DIR)/* $(BUILD_DIR)/
+	BELA_EXPERT_MODE=1 ../Bela/scripts/build_project.sh --force -m "'LDLIBS=$(BELA_LDLIBS)' 'CPPFLAGS=$(BELA_CPPFLAGS)'" -c "$(BELA_COMMAND_ARGS)" $(BUILD_DIR) -n
+
 $(BUILD_DIR)/render.cpp: $(DSP_FILE) faust/architecture/bela.cpp
 	@echo RUNNING FAUST
 	ARCHFILE="$(ARCHFILE)" faust2bela -gui $(DSP_FILE)
