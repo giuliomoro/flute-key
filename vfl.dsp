@@ -122,5 +122,5 @@ flow = env1 + breath*breathAmp + vibrato;
 
 //instrReverb is declared in instruments.lib
 audioInputGain = 1;
-process =  audioInputGain*_ :(   (_ <:(_,_)),_ : _ * (feedBack2) + ( flow + _ * (feedBack1) + _: embouchureDelay : poly)  : reflexionFilter)~(boreDelay : NLFM) : *(env2)*gain :
-stereo : instrReverb;
+process =  audioInputGain*_ :(   (_ <:(_,_)),_ : _ * (feedBack2) + ( flow + _ * (feedBack1) + _: embouchureDelay : poly)  : reflexionFilter)~(boreDelay : NLFM) : *(env2)*gain : fi.dcblocker: stereo : instrReverb;
+
