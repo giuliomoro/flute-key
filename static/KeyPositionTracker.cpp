@@ -47,12 +47,13 @@ bool KeyBuffers::setup(unsigned int numKeys, unsigned int bufferLength)
 void KeyBuffers::postCallback(void* arg, float* buffer, unsigned int length)
 {
 	KeyBuffers* that = (KeyBuffers*)arg;
-	that->postCallback(buffer, length);
+	static int count = 0;
+	that->postCallback(buffer, length, count/1000.f);
+	++count;
 }
 
-void KeyBuffers::postCallback(float* buffer, unsigned int length)
+void KeyBuffers::postCallback(float* buffer, unsigned int length, timestamp_type timestamp)
 {
-	static timestamp_type ts = 0;
 	for(unsigned int n = 0; n < std::min(positionBuffer.size(), length); ++n)
 	{
 		positionBuffer[n][writeIdx] = buffer[n];
@@ -64,9 +65,8 @@ TODO: fix this instead of using static ts
 		else
 			ts = writeIdx;
 			*/
-		timestamps[n][writeIdx] = ts;
+		timestamps[n][writeIdx] = timestamp;
 	}
-	++ts;
 	++writeIdx;
 	if(writeIdx >= positionBuffer[0].size())
 	{
@@ -256,10 +256,10 @@ KeyPositionTracker::PercussivenessFeatures KeyPositionTracker::pressPercussivene
     }
 
 	bool notPercussive = false;
-    if(maximumVelocity < 0.003)
+    if(maximumVelocity < kPositionTrackerMaxVelocityPercussiveThreshold)
     {
 	    notPercussive = true;
-	    rt_printf("notPercussive ");
+	    //rt_printf("notPercussive ");
     }
     // Now transfer what we've found to the data structure
     features.velocitySpikeMaximum = Event(maximumVelocityIndex, maximumVelocity, keyBuffer_.timestampAt(maximumVelocityIndex));
@@ -605,7 +605,7 @@ void KeyPositionTracker::triggerReceived(/*TriggerSource* who,*/ timestamp_type 
 			//rt_printf("inst: %f\n", instantaneousVelocity);
 			if(instantaneousVelocity > kPositionTrackerPeakInstantaneousVelocityMinThreshold)
 			{
-				rt_printf("==========gotit %f\n", instantaneousVelocity);
+				//rt_printf("==========gotit %f\n", instantaneousVelocity);
 				//gPercussed = 0.5;
 				percussivenessAvailableIndex_ = currentBufferIndex + kSamplesNeededForPercussiveness;
 				timestamp_type stateChangeTimestamp = latestTimestamp() > currentMaxTimestamp_ ? latestTimestamp() : currentMaxTimestamp_;
@@ -699,7 +699,7 @@ float avVel = percussivenessFeatures_.velocityAverageAroundSpike;
 	    myArr[n] *= 1;
     }
     myArr[3] = currentState_/(float)kPositionTrackerStateReleaseFinished;
-    scope.log(myArr);
+    //scope.log(myArr);
 }
 
 // Change the current state of the tracker and generate a notification
@@ -991,7 +991,7 @@ void KeyPositionTracker::insert(KeyPositionTrackerNotification notification, tim
 				rt_printf("areaFollowingSpike: %10.5f, ", p.areaFollowingSpike);
 				rt_printf("\n");
 				} else {
-					rt_printf("p: perc at %f\n", timestamp);
+					//rt_printf("p: perc at %f\n", timestamp);
 				}
 				}
 			} else {
@@ -1009,10 +1009,10 @@ void KeyPositionTracker::insert(KeyPositionTrackerNotification notification, tim
 KeyPositionTracker::Event KeyPositionTracker::getPercussiveness()
 {
 	Event event;
-	if(percussivenessFeatures_.hasBeenRead == false)
+	if(percussivenessFeatures_.hasBeenRead == false && percussivenessFeatures_.percussiveness)
 	{
 		event = percussivenessFeatures_.velocitySpikeMaximum;
-		rt_printf("sharing percussivness: %f\n", event.position);
+		//rt_printf("sharing percussiveness: %f\n", event.position);
 		percussivenessFeatures_.hasBeenRead = true;
 	} else {
 		event.index = missing_value<key_buffer_index>::missing();

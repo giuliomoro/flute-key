@@ -79,6 +79,7 @@ const int kPositionTrackerSamplesToAverageForStartVelocity = 3;
 const key_velocity kPositionTrackerStartVelocityThreshold = scale_key_velocity(0.5);
 const key_velocity kPositionTrackerStartVelocitySpikeThreshold = scale_key_velocity(2.5);
 const key_velocity kPositionTrackerReleaseVelocityThreshold = scale_key_velocity(-0.2);
+const key_velocity kPositionTrackerMaxVelocityPercussiveThreshold = 0.006;
 
 // Constants for feature calculations. The first one is the approximate location of the escapement
 // (empirically measured on one piano, so only approximate), used for velocity calculations
@@ -92,7 +93,7 @@ class KeyBuffers
 {
 public:
 	bool setup(unsigned int numKeys, unsigned int bufferLength);
-	void postCallback(float* buffer, unsigned int length);
+	void postCallback(float* buffer, unsigned int length, timestamp_type timestamp);
 	static void postCallback(void* arg, float* buffer, unsigned int length);
 	std::vector<std::vector<timestamp_type>> timestamps;
 	std::vector<std::vector<float>> positionBuffer;
