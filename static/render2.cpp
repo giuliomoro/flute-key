@@ -13,9 +13,7 @@ float gPercFlag;
 
 #define SCOPE
 #define SCANNER
-#define KEYPOSITIONTRACKER
 #define FILE_PLAYBACK
-#define EMB_ATTACK
 //#define LOOKUP
 
 #ifdef SCOPE
@@ -27,14 +25,12 @@ Keys* keys;
 BoardsTopology bt;
 int gKeyOffset = 46; //34
 int gNumKeys = 24; // 38
-#ifdef KEYPOSITIONTRACKER
 #include "KeyPositionTracker.h"
 #include "KeyboardState.h"
 KeyboardState keyboardState;
 KeyBuffers keyBuffers;
 std::vector<KeyBuffer> keyBuffer;
 std::vector<KeyPositionTracker> keyPositionTrackers;
-#endif /* KEYPOSITIONTRACKER */
 #ifdef FILE_PLAYBACK
 #include "SampleLoader.h"
 std::vector<std::vector<float>> gPlaybackBuffers;
@@ -111,7 +107,6 @@ void getEmbFreq(int range, float idx, float& freq, float& emb)
 
 float positionToPressure(float idx)
 {
-
 	return idx;
 }
 
@@ -166,13 +161,11 @@ void Bela_userSettings2(BelaInitSettings* settings)
 	printf("Bela__user_settings2\n");
 }
 
-DR embEnv(1000);
 void postCallback(void* arg, float* buffer, unsigned int length){
 	//Keys* keys = (Keys*)arg;
 	int firstKey = gKeyOffset;
 	int lastKey = gKeyOffset + gNumKeys + 1;
 	unsigned int key = 46;
-#ifdef KEYPOSITIONTRACKER
 	static int count;
 	{
 		for(unsigned int n = 0; n < length; ++n)
@@ -350,12 +343,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	float pressureScale = targetPressureScale * (1.f - pressureScaleSmoother) + pressureScaleSmoother * oldPressureScale;
 	oldPressureScale = pressureScale;
 	float candidatePos = pressure * pressureScale;
-	static float oldPos;
-	if(std::abs(std::abs(oldPos) - candidatePos) > 0.05)
-	{
-		//rt_printf("HEREEEE\n");
-	}
-	oldPos = candidatePos;
 
 	const float maxGain = 0.3;
 	float aboveThreshold = constrain(candidatePos - maxPressureAtLow, 0, 1);
@@ -368,8 +355,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 	//if(percEmbouchureOffset > 0.001)
 		//rt_printf("percEmbouchureOffset = %.4f\n", percEmbouchureOffset);
-	gAux = 1.f + bendEmbouchureOffset + 1.f * (int)(embEnv.render() + 0.5f);
-	if(1 && (count % 50 == 0))
+	gAux = 1.f + bendEmbouchureOffset;
+	if(0 && (count % 50 == 0))
 		rt_printf("candidatePos: %.4f, key: %4d, other: %2d, idx: %.4f, emb: %.4f, freq: %.4f\n", candidatePos, keyboardState.getKey(), keyboardState.getOtherKey(), idx, gAux, bendFreq);
 #if 0
 	{
@@ -484,7 +471,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 	static float lastPerc = 0;
 	float newPerc = keyboardState.getPercussiveness();
-	if(1)
 	if(newPerc != lastPerc && newPerc)
 	{
 		gPerc = newPerc;
@@ -504,11 +490,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		if(nextBuffer == gPlaybackBuffers.size())
 			nextBuffer = 0;
 #endif /* FILE_PLAYBACK */
-#ifdef EMB_ATTACK
-		gPercFlag = gPerc;
-		float decayTime = gPerc / 4.f;
-		embEnv.start(30, decayTime, 1, 0.01);
-#endif /* EMB_ATTACK */
 	}
 	gPerc *= 0.95f;
 	lastPerc = newPerc;
@@ -518,8 +499,12 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	else 
 		candidatePos = (candidatePos - posThreshold) / (1.f - posThreshold);
 	static float pastPos = 0;
-	if(candidatePos - pastPos > 0.1)
-		gPos = gPos*0.9f + candidatePos * 0.1f;// slew-rate limit;
+
+	// avoid clicks:
+	const float clickThreshold = 0.07;
+	const float clickSmoothAlpha = 0.92
+	if(std::abs(candidatePos - pastPos) > clickThreshold)
+		gPos = gPos * clickSmoothAlpha + candidatePos * (1.f - clickSmoothAlpha);
 	else
 		gPos = candidatePos;
 	pastPos = gPos;
@@ -553,7 +538,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		oldOtherKey = newOtherKey;
 	}
 	return;
-#endif /* KEYPOSITIONTRACKER */
 }
 
 bool setup2(BelaContext *context, void *userData)
@@ -590,7 +574,6 @@ bool setup2(BelaContext *context, void *userData)
 	bt.setBoard(0, 0, 24);
 	bt.setBoard(1, 0, 23);
 	bt.setBoard(2, 0, 23);
-#ifdef KEYPOSITIONTRACKER
 	int bottomKey = bt.getLowestNote();
 	int topKey = bt.getHighestNote();
 	int numKeys = topKey - bottomKey + 1;
@@ -610,7 +593,6 @@ bool setup2(BelaContext *context, void *userData)
 		keyPositionTrackers.back().engage();
 	}
 	keyboardState.setup(numKeys);
-#endif /* KEYPOSITIONTRACKER */
 	keys->setPostCallback(postCallback, keys);
 	int ret = keys->start(&bt, NULL);
 	if(ret < 0)
