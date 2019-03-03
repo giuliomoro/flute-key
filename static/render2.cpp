@@ -59,9 +59,25 @@ float getMaxPressure(float key)
 typedef struct {
 	float emb;
 	float freq;
-	float res;
+	float finalPitch;
 } TuningData;
 
+TuningData gTuning1Down[] = {
+{1.0, 0, 60},
+{0.95, 0, 59.78},
+{0.9, 0, 59.52},
+{0.95, -0.5, 59.28},
+{1, -1, 59}
+};
+TuningData gTuning1Up[] = {
+{1.0, 0, 60},
+{1.05, 0, 60.20},
+{1.1, 0, 60.39},
+{1.15, 0, 60.56},
+{1.10, 0.333, 60.72},
+{1.05, 0.666, 60.86},
+{1.00, 1, 61}
+};
 TuningData gTuning2Up[] = {
 {1.0, 0, 60},
 {1.05, 0, 60.2},
@@ -80,14 +96,22 @@ TuningData gTuning2Up[] = {
 
 void getEmbFreq(int range, float idx, float& freq, float& emb)
 {
+#define ASSIGN_TUNING(vec) buf = vec; nrow = sizeof(vec)/sizeDen;
 	int sizeDen = sizeof(TuningData);
 	TuningData* buf = NULL;
 	int nrow = 0;
 	switch (range){
-		case 2:
-			buf = gTuning2Up;
-			nrow = sizeof(gTuning2Up)/sizeDen;
+		case -1:
+			ASSIGN_TUNING(gTuning1Down);
 			break;
+		case 1:
+			ASSIGN_TUNING(gTuning1Up);
+			break;
+		case 2:
+			ASSIGN_TUNING(gTuning2Up);
+			break;
+		default:
+			;
 	}
 	if(!buf)
 	{
@@ -103,7 +127,7 @@ void getEmbFreq(int range, float idx, float& freq, float& emb)
 	emb = buf[iint].emb * (1.f - ifrac) + buf[iint+1].emb * ifrac;
 	//rt_printf("nrow: %d, idx: %f, i: %f, iint: %d, ifrac: %f, emb: %f, freq: %f\n", 
 		//nrow, idx, i, iint, ifrac, emb, freq);
-
+	emb -= 1;
 }
 #endif /* LOOKUP */
 
