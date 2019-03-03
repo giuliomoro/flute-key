@@ -230,7 +230,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		const float embClip = 1.2;
 		const float bendStateHighToLowThreshold = 0.6;
 
-		static int embClipped = 0;
 		static int bendState = kBendStateLow;
 		static float transitioningEmbouchureOffset = 0;
 		static float transitionStartEmb;
@@ -248,7 +247,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				lowStartEmb = 0;
 				lowStartIdx = 0;
 			}
-			embClipped = 0;
 		}
 
 		float alpha = 0.99;
@@ -272,7 +270,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				idx/embPeakIdx : (embStopIdx-idx)/(embStopIdx - embPeakIdx);
 			embNormalized *= embClip;
 			embNormalized = embNormalized < 0 ? 0 : embNormalized;
-			embNormalized = embNormalized > 1 ? (++embClipped, 1) : (--embClipped, embNormalized);
+			embNormalized = embNormalized > 1 ? 1 : embNormalized;
 
 			embNormLeaky = embNormalized * (1.f-alpha) + embNormLeaky * alpha; 
 			//rt_printf("leaky: %.5f\n", embNormLeaky);
