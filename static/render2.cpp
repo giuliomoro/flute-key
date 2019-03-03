@@ -207,7 +207,13 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	if(0)
 	{
 		// basic bending
-		bendFreq = keyboardState.getBend();
+		float bendRange = keyboardState.getBendRange(); //positive (bending up) or negative (bending down)
+		if(bendRange)
+		{
+			bendFreq = powf(keyboardState.getBend()/bendRange, 1) * bendRange;
+		} else {
+			bendFreq = 0;
+		}
 		bendEmbouchureOffset = 0;
 	} else {
 		// improved bending, with embouchure
