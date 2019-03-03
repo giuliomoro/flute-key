@@ -11,6 +11,8 @@ extern float gGain;
 extern float gAux;
 float gPercFlag;
 
+float gAnalogInRead;
+
 #define SCOPE
 #define SCANNER
 #define FILE_PLAYBACK
@@ -189,7 +191,14 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	//scope.log(buffer[59], buffer[60], buffer[61]);
 	keyboardState.render(buffer, keyPositionTrackers, firstKey, lastKey);
 	float pressure = keyboardState.getPosition();
-	pressure = pressure <= 0 ? 0 :pressure*pressure;
+	float expo = gAnalogInRead * 2.f + 0.5;
+	if(pressure <= 0)
+		pressure = 0;
+	else if(pressure <= 1)
+		pressure = powf(pressure, expo);
+	else if(pressure > 1)
+		pressure = powf(pressure, 2); // fixed curve for aftertouch
+	pressure = pressure > 1 ? 1 : pressure; // TODO: do proper key-bottom calibration and remove this one
 
 	float bendFreq = 0;
 	static float bendEmbouchureOffset = 0;
@@ -612,7 +621,7 @@ unsigned int gSampleCount = 0;
 DR dr(44100);
 void render2(BelaContext *context, void *userData)
 {
-
+	gAnalogInRead = analogRead(context, 0, 0);
 	float* audioIn = (float*)context->audioIn;
 	for(unsigned int n = 0; n < context->audioFrames; ++n)
 	{
