@@ -91,12 +91,14 @@ float gKey;
 float gPos;
 float gGate;
 float gPerc;
+float gGain;
 float gAux;
 float* gExterns[] = {
     &gKey,
     &gPos,
     &gGate,
     &gPerc,
+    &gGain,
     &gAux,
 };
 
@@ -140,6 +142,7 @@ const char* const pinNamesStrings[] =
     "POS",
     "GATE",
     "PERC",
+    "GAIN",
     "AUX",
 };
 
@@ -184,6 +187,7 @@ enum EInOutPin
     kPOS,
     kGATE,
     kPERC,
+    kGAIN,
     kAUX,
     kNumInputPins
 };
@@ -281,8 +285,11 @@ public:
             case kPOS:
             case kGATE:
             case kPERC:
-            case kAUX:
+            case kGAIN:
                 *fZone = *gExterns[fBelaPin - kKEY] * fRange + fMin;
+                 break;
+            case kAUX:
+                *fZone = gAux;
                  break;
                 
             default:
@@ -506,6 +513,7 @@ bool setup(BelaContext* context, void* userData)
 }
 
 void render2(BelaContext* context, void* userData);
+void renderPost(BelaContext* context, void* userData);
 void render(BelaContext* context, void* userData)
 {
     render2(context, userData);
@@ -519,6 +527,7 @@ void render(BelaContext* context, void* userData)
     GUI::updateAllGuis();
     // Process Faust DSP
     gDSP->compute(context->audioFrames, gInputs, gOutputs);
+	renderPost(context, userData);
 }
 
 void cleanup2(BelaContext* context, void* userData);
