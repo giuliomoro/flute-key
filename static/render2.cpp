@@ -314,13 +314,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	float gainNormalized = (1.f - 1.3f*(sqrtf(aboveThreshold)));
 	gainNormalized = constrain(gainNormalized, 0, 1);
 	float realKey = keyboardState.getKey();
-	gGain = maxGain * gainNormalized;
-		
-	gKey = realKey - gKeyOffset + bendFreq;
-
-	//if(percEmbouchureOffset > 0.001)
-		//rt_printf("percEmbouchureOffset = %.4f\n", percEmbouchureOffset);
-	gAux = 1.f + bendEmbouchureOffset;
 	if(0 && (count % 50 == 0))
 		rt_printf("candidatePos: %.4f, key: %4d, other: %2d, idx: %.4f, emb: %.4f, freq: %.4f\n", candidatePos, keyboardState.getKey(), keyboardState.getOtherKey(), idx, gAux, bendFreq);
 
@@ -362,6 +355,9 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	else
 		gPos = candidatePos;
 	pastPos = gPos;
+	gGain = maxGain * gainNormalized;
+	gKey = fixTuning(realKey - gKeyOffset + bendFreq, gPos);
+	gAux = 1.f + bendEmbouchureOffset;
 	gGate = 1;
 	//printing
 	{

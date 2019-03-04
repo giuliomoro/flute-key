@@ -55,7 +55,7 @@ static TuningData gTuning3Up[] = {
 {1.15, 2.18, 62.72},
 {1.1, 2.48, 62.85},
 {1.05, 2.72, 62.90},
-{1.00, 3.02, 63.00}
+{1.00, 3.0, 63.00} // was 3.02, rounded because now that is handled by fixTuning
 };
 static TuningData gTuning4Up[] = {
 {1.0, 0, 60},
@@ -88,7 +88,7 @@ static TuningData gTuning4Up[] = {
 {1.15, 3.13, 63.67},
 {1.1, 3.45, 63.81},
 {1.05, 3.73, 63.91},
-{1.00, 4.03, 64.00},
+{1.00, 4.00, 64.00}, // was 4.03, rounded because now that is handled by fixTuning
 };
 static TuningData gTuning1Down[] = {
 {1.0, 0, 60},
@@ -106,7 +106,7 @@ static TuningData gTuning2Down[] = {
 {0.85, -0.56, 58.68},
 {0.9, -1.08, 58.45},
 {0.95, -1.56, 58.23},
-{1.0, -2.01, 58.00},
+{1.0, -2.00, 58.00}, // was -2.01, rounded because now that is handled by fixTuning
 };
 
 static TuningData gTuning3Down[] = {
@@ -120,7 +120,7 @@ static TuningData gTuning3Down[] = {
 {0.85, -1.3, 57.94},
 {0.9, -1.9, 57.63},
 {0.95, -2.47, 57.32},
-{1.00, -3.02, 57.00},
+{1.00, -3.00, 57.00}, // was -3.02, rounded because now that is handled by fixTuning
 };
 
 static TuningData gTuning4Down[] = {
@@ -138,7 +138,7 @@ static TuningData gTuning4Down[] = {
 {0.85, -2.53, 56.72},
 {0.9, -3.06, 56.48},
 {0.95, -3.56, 56.24},
-{1.00, -4.02, 56.00},
+{1.00, -4.00, 56.00}, // was 4.02, rounded because now that is handled by fixTuning
 };
 void getEmbFreq(int range, float idx, float& freq, float& emb)
 {
@@ -191,3 +191,27 @@ void getEmbFreq(int range, float idx, float& freq, float& emb)
 	emb -= 1;
 }
 
+/* fit a straight line to the experimental points in Matlab
+x = [36, 35.92
+42, 41.91
+48, 47.87
+54, 53.84
+60, 59.80
+66, 65.75
+72, 71.68
+78, 77.60
+84, 83.55];
+poly = polyfit(x(:,1), x(:,2), 1);
+*/
+
+// values computed by the Matlab code above
+float tuningCorrectionM = 0.99200000;
+float tuningCorrectionY0 = 0.24888889;
+
+float fixTuning(float nominalFreq, float pressure)
+{
+	float m = tuningCorrectionM;
+	float y0 = tuningCorrectionY0;
+	float x = nominalFreq;
+	return m * x + y0;
+}
