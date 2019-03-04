@@ -16,8 +16,11 @@ float gAnalogInRead;
 #define SCOPE
 #define SCANNER
 #define FILE_PLAYBACK
-//#define LOOKUP
+#define LOOKUP
 
+#ifdef LOOKUP
+#include "tuning.h"
+#endif /* LOOKUP */
 #ifdef SCOPE
 #include <Scope.h>
 Scope scope;
@@ -55,81 +58,6 @@ float getMaxPressure(float key)
 	return 1.f - (key - attenuationStart)/slope;
 }
 
-#ifdef LOOKUP
-typedef struct {
-	float emb;
-	float freq;
-	float finalPitch;
-} TuningData;
-
-TuningData gTuning1Down[] = {
-{1.0, 0, 60},
-{0.95, 0, 59.78},
-{0.9, 0, 59.52},
-{0.95, -0.5, 59.28},
-{1, -1, 59}
-};
-TuningData gTuning1Up[] = {
-{1.0, 0, 60},
-{1.05, 0, 60.20},
-{1.1, 0, 60.39},
-{1.15, 0, 60.56},
-{1.10, 0.333, 60.72},
-{1.05, 0.666, 60.86},
-{1.00, 1, 61}
-};
-TuningData gTuning2Up[] = {
-{1.0, 0, 60},
-{1.05, 0, 60.2},
-{1.1, 0, 60.39},
-{1.15, 0, 60.56},
-{1.2, 0, 60.71},
-{1.25, 0.5, 60.86},
-{1.3, 0, 61.0},
-{1.25, 0.3, 61.16},
-{1.2, 0.62, 61.33},
-{1.15, 0.95, 61.5},
-{1.1,  1.28, 61.66},
-{1.05, 1.64, 61.83},
-{1, 2, 62.0}
-};
-
-void getEmbFreq(int range, float idx, float& freq, float& emb)
-{
-#define ASSIGN_TUNING(vec) buf = vec; nrow = sizeof(vec)/sizeDen;
-	int sizeDen = sizeof(TuningData);
-	TuningData* buf = NULL;
-	int nrow = 0;
-	switch (range){
-		case -1:
-			ASSIGN_TUNING(gTuning1Down);
-			break;
-		case 1:
-			ASSIGN_TUNING(gTuning1Up);
-			break;
-		case 2:
-			ASSIGN_TUNING(gTuning2Up);
-			break;
-		default:
-			;
-	}
-	if(!buf)
-	{
-		freq = 0;
-		emb = 0;
-		return;
-	}
-	float i = (idx * (nrow - 1));
-	int iint = (int)i;
-	float ifrac = i - iint;
-	// linearly interpolate between the values
-	freq = buf[iint].freq * (1.f - ifrac) + buf[iint+1].freq * ifrac;
-	emb = buf[iint].emb * (1.f - ifrac) + buf[iint+1].emb * ifrac;
-	//rt_printf("nrow: %d, idx: %f, i: %f, iint: %d, ifrac: %f, emb: %f, freq: %f\n", 
-		//nrow, idx, i, iint, ifrac, emb, freq);
-	emb -= 1;
-}
-#endif /* LOOKUP */
 
 float positionToPressure(float idx)
 {
@@ -191,7 +119,9 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	//Keys* keys = (Keys*)arg;
 	int firstKey = gKeyOffset;
 	int lastKey = gKeyOffset + gNumKeys + 1;
+#ifdef SINGLE_KEY
 	unsigned int key = 46;
+#endif /* SINGLE_KEY */
 	static int count;
 	{
 		for(unsigned int n = 0; n < length; ++n)
@@ -539,7 +469,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 	// avoid clicks:
 	const float clickThreshold = 0.07;
-	const float clickSmoothAlpha = 0.92
+	const float clickSmoothAlpha = 0.92;
 	if(std::abs(candidatePos - pastPos) > clickThreshold)
 		gPos = gPos * clickSmoothAlpha + candidatePos * (1.f - clickSmoothAlpha);
 	else
