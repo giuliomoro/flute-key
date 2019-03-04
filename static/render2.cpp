@@ -58,7 +58,6 @@ float getMaxPressure(float key)
 	return 1.f - (key - attenuationStart)/slope;
 }
 
-
 float positionToPressure(float idx)
 {
 	return idx;
@@ -112,7 +111,6 @@ void Bela_userSettings2(BelaInitSettings* settings)
 {
 	settings->pruNumber = 0;	
 	settings->useDigital = 0;
-	printf("Bela__user_settings2\n");
 }
 
 void postCallback(void* arg, float* buffer, unsigned int length){
@@ -325,116 +323,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	gAux = 1.f + bendEmbouchureOffset;
 	if(0 && (count % 50 == 0))
 		rt_printf("candidatePos: %.4f, key: %4d, other: %2d, idx: %.4f, emb: %.4f, freq: %.4f\n", candidatePos, keyboardState.getKey(), keyboardState.getOtherKey(), idx, gAux, bendFreq);
-#if 0
-	{
-		// low/high mode state machine, triggered by fully pressing one key while releasing the other one
-		enum {
-		kStateLower,
-		kStateWaitingForHigher,
-		kStateHigher,
-		kStateWaitingForLower,
-		kStateReleased,
-		};
-		int key = keyboardState.getKey();
-		static int boardState = kStateReleased;
-		static int keyState;
-		int oldBoardState = boardState;
-		keyState = keyPositionTrackers[key].currentState();
-		if(kPositionTrackerStateReleaseFinished == keyState 
-			|| kPositionTrackerStateUnknown == keyState)
-		{
-			boardState = kStateReleased;
-		}
-		if(kStateLower == boardState)
-		{
-			if(kPositionTrackerStateReleaseInProgress == keyState)
-			{
-				boardState = kStateWaitingForHigher;
-			}
-		} else if(kStateWaitingForHigher == boardState)
-		{
-			if(kPositionTrackerStatePartialPressAwaitingMax == keyState 
-			|| kPositionTrackerStatePartialPressFoundMax == keyState
-			|| kPositionTrackerStatePressInProgress == keyState
-			|| kPositionTrackerStateDown == keyState
-			) {
-				boardState = kStateHigher;
-			}
-		} else if(kStateHigher == boardState)
-		{
-			if(kPositionTrackerStateReleaseInProgress == keyState)
-			{
-				boardState = kStateWaitingForLower;
-			}
-		} else if(kStateWaitingForLower == boardState)
-		{
-			if(kPositionTrackerStatePartialPressAwaitingMax == keyState 
-			|| kPositionTrackerStatePartialPressFoundMax == keyState
-			|| kPositionTrackerStatePressInProgress == keyState
-			|| kPositionTrackerStateDown == keyState
-			) {
-				boardState = kStateLower;
-			}
-		} else if(kStateReleased == boardState)
-		{
-			if(kPositionTrackerStatePartialPressAwaitingMax == keyState 
-			|| kPositionTrackerStatePartialPressFoundMax == keyState
-			|| kPositionTrackerStatePressInProgress == keyState
-			|| kPositionTrackerStateDown == keyState
-			) {
-				boardState = kStateLower;
-			}
-		}
-
-		static int latestHiLo = kStateLower;
-		if(kStateLower == boardState
-			|| kStateHigher == boardState)
-		{
-			latestHiLo = boardState;
-		}
-		if(boardState != oldBoardState)
-		{
-			rt_printf("%d (from %d)\n", boardState, oldBoardState);
-		}
-		if(kStateHigher == latestHiLo)
-		{
-			gAux = 2;
-		} else if(kStateLower == latestHiLo){
-			gAux = 1;
-		}
-	}
-#endif
-#if 0
-	{ // after state
-		enum {
-			kAfterStateOff,
-			kAfterStateOn
-		}
-		static int afterState = kAfterStateOff;
-		static int keyState;
-		static int oldKeyState;
-		int key = keyboardState.getKey();
-		keyState = keyPositionTrackers[key].currentState();
-		static float afterStartPos = 0;
-
-
-		int oldAfterState = a
-		if(kPositionTrackerStateDown == keyState
-			&& kPositionTrackerStateDown != oldKeyState)
-		{
-			afterState = kAfterStateOn;
-			afterStartPos = keyboardState.getPosition();
-		}
-		if(kPositionTrackerStateDown != keyState
-			&& kPositionTrackerStateDown == oldKeyState)
-		{
-			afterState = kAfterStateOff;
-		}
-	
-		if(
-		oldKeyState = keyState;
-	}
-#endif
 
 	static float lastPerc = 0;
 	float newPerc = keyboardState.getPercussiveness();
@@ -445,7 +333,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		gPerc *= gPerc;
 #ifdef FILE_PLAYBACK
 		static int nextBuffer;
-		rt_printf("nextBuffer: %d\n\n", nextBuffer);
 		gStartPlay = nextBuffer;
 		static int thisBuffer = 0;
 		thisBuffer++;
