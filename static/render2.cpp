@@ -29,8 +29,8 @@ Scope scope;
 #include <Keys.h>
 Keys* keys;
 BoardsTopology bt;
-int gKeyOffset = 46; //34
-int gNumKeys = 24; // 38
+int gKeyOffset = 34; //34
+int gNumKeys = 38; // 38
 #include "KeyPositionTracker.h"
 #include "KeyboardState.h"
 KeyboardState keyboardState;
@@ -350,17 +350,21 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	static float pastPos = 0;
 
 	// avoid clicks:
-	const float clickThreshold = 0.07;
+	const float clickThreshold = 0.05;
 	const float clickSmoothAlpha = 0.92;
+	candidatePos = candidatePos * 1.4f + 0.5f;
+	pastPos = gPos;
 	if(std::abs(candidatePos - pastPos) > clickThreshold)
 		gPos = gPos * clickSmoothAlpha + candidatePos * (1.f - clickSmoothAlpha);
 	else
 		gPos = candidatePos;
+	//gPos = 1.2; // use this to test tuning
 	pastPos = gPos;
 	gGain = maxGain * gainNormalized;
-	gKey = fixTuning(realKey - gKeyOffset + bendFreq, gPos);
+	gKey = fixTuning(realKey + bendFreq + 12, gPos);
 	gAux = 1.f + bendEmbouchureOffset;
 	gGate = 1;
+
 	//printing
 	{
 		static int count = 0;

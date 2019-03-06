@@ -7,38 +7,44 @@ declare licence "STK-4.3"; // Synthesis Tool Kit 4.3 (MIT style license);
 declare description "A simple flute based on Smith algorythm: https://ccrma.stanford.edu/~jos/pasp/Flutes_Recorders_Pipe_Organs.html"; 
 
 import("instruments.lib");
+import("compressors.lib");
+import("physmodels.lib");
 
 //==================== GUI SPECIFICATION ================
 
-freq = hslider("h:Basic_Parameters/freq [1][unit:Hz] [tooltip:Tone frequency][BELA:KEY]",440,116.5409,2000,1);
-gain = nentry("h:Basic_Parameters/gain [1][tooltip:Gain (value between 0 and 1)]",0.5,0,1,0.01);
+freq = hslider("h:Basic_Parameters/freq [1][unit:Hz] [tooltip:Tone frequency][BELA:KEY]",440,50,2000,1) : si.smooth(0.99);
+gain = nentry("h:Basic_Parameters/gain [1][tooltip:Gain (value between 0 and 1)][BELA:GAIN]",0.3,0,1,0.01) : si.smoo;
 gate = checkbox("h:Basic_Parameters/gate [1][tooltip:noteOn = 1, noteOff = 0][BELA:GATE]") : int;
 
 pressure = hslider("h:Physical_and_Nonlinearity/v:Physical_Parameters/Pressure 
-[2][tooltip:Breath pressure (value bewteen 0 and 1)][BELA:POS]",0.9,0,1.6,0.01) : si.smooth(0.9);
-breathAmp = hslider("h:Physical_and_Nonlinearity/v:Physical_Parameters/Noise Gain 
-[2][tooltip:Breath noise gain (value between 0 and 1)][BELA:PERC]",0.1,0.05,0.8,0.01)/10;
+[2][tooltip:Breath pressure (value bewteen 0 and 1)][BELA:POS]",1.0,0.5,1.9,0.01) : si.smooth(0.92);
+breathAmp = hslider("h:Physical_and_Nonlinearity/v:Physical_Parameters/NoiseGain 
+[2][tooltip:Breath noise gain (value between 0 and 1)]",0.1,0.05,0.8,0.01)/10;
+//gPerc = hslider("h:Physical_and_Nonlinearity/h:Physical_Parameters/NoiseGain 
+//[2][tooltip:Breath noise gain (value between 0 and 1)][BELA:PERC]",0.1,0.00,1,0.01);
+gPerc = 0;
 
-typeModulation = nentry("h:Physical_and_Nonlinearity/v:Nonlinear_Filter_Parameters/Modulation_Type 
+typeModulation = nentry("h:Physical_and_Nonlinearity/h:Nonlinear_Filter_Parameters/Modulation_Type 
 [3][tooltip: 0=theta is modulated by the incoming signal; 1=theta is modulated by the averaged incoming signal;
 2=theta is modulated by the squared incoming signal; 3=theta is modulated by a sine wave of frequency freqMod;
 4=theta is modulated by a sine wave of frequency freq;]",0,0,4,1);
-nonLinearity = hslider("h:Physical_and_Nonlinearity/v:Nonlinear_Filter_Parameters/Nonlinearity 
-[3][tooltip:Nonlinearity factor (value between 0 and 1)][BELA:AUX]",0.12,0,1,0.01);
-frequencyMod = hslider("h:Physical_and_Nonlinearity/v:Nonlinear_Filter_Parameters/Modulation_Frequency 
+nonLinearity = hslider("h:Physical_and_Nonlinearity/h:Nonlinear_Filter_Parameters/Nonlinearity 
+[3][tooltip:Nonlinearity factor (value between 0 and 1)]",0.12,0,1,0.01);
+frequencyMod = hslider("h:Physical_and_Nonlinearity/h:Nonlinear_Filter_Parameters/Modulation_Frequency 
 [3][unit:Hz][tooltip:Frequency of the sine wave for the modulation of theta (works if Modulation Type=3)]",220,20,1000,0.1);
 nonLinAttack = hslider("h:Physical_and_Nonlinearity/v:Nonlinear_Filter_Parameters/Nonlinearity Attack
 [3][unit:s][Attack duration of the nonlinearity]",0,0,2,0.01);
+embRatio = hslider("h:Physical_and_Nonlinearity/h:embouchure_ratio[BELA:AUX]", 1.0, 0.0, 8.0, 0.01) : si.smooth(0.998);
 
-vibratoFreq = hslider("h:Envelopes_and_Vibrato/v:Vibrato_Parameters/Vibrato_Freq 
+vibratoFreq = hslider("h:Envelopes_and_Vibrato/h:Vibrato_Parameters/Vibrato_Freq 
 [4][unit:Hz]",5,1,15,0.1);
-vibratoGain = hslider("h:Envelopes_and_Vibrato/v:Vibrato_Parameters/Vibrato_Gain
-[4][tooltip:A value between 0 and 1]",0.1,0,1,0.01);
-vibratoBegin = hslider("h:Envelopes_and_Vibrato/v:Vibrato_Parameters/Vibrato_Begin
+vibratoGain = hslider("h:Envelopes_and_Vibrato/h:Vibrato_Parameters/Vibrato_Gain
+[4][tooltip:A value between 0 and 1]",0,0,1,0.01);
+vibratoBegin = hslider("h:Envelopes_and_Vibrato/h:Vibrato_Parameters/Vibrato_Begin
 [4][unit:s][tooltip:Vibrato silence duration before attack]",0.1,0,2,0.01);
-vibratoAttack = hslider("h:Envelopes_and_Vibrato/v:Vibrato_Parameters/Vibrato_Attack 
+vibratoAttack = hslider("h:Envelopes_and_Vibrato/h:Vibrato_Parameters/Vibrato_Attack 
 [4][unit:s][tooltip:Vibrato attack duration]",0.5,0,2,0.01);
-vibratoRelease = hslider("h:Envelopes_and_Vibrato/v:Vibrato_Parameters/Vibrato_Release 
+vibratoRelease = hslider("h:Envelopes_and_Vibrato/h:Vibrato_Parameters/Vibrato_Release 
 [4][unit:s][tooltip:Vibrato release duration]",0.2,0,2,0.01);
 
 pressureEnvelope = checkbox("h:Envelopes_and_Vibrato/v:Pressure_Envelope_Parameters/Pressure_Env 
@@ -54,7 +60,6 @@ env2Attack = hslider("h:Envelopes_and_Vibrato/v:Global_Envelope_Parameters/Glob_
 [6][unit:s][tooltip:Global envelope attack duration]",0.04,0,2,0.01);
 env2Release = hslider("h:Envelopes_and_Vibrato/v:Global_Envelope_Parameters/Glob_Env_Release 
 [6][unit:s][tooltip:Global envelope release duration]",0.1,0,2,0.01);
-embRatio = hslider("embouchure ratio", 1.0, 1.0, 8.0, 0.01);
 
 //==================== SIGNAL PROCESSING ================
 
@@ -96,8 +101,8 @@ reflexionFilter = fi.lowpass(1,2000);
 // fractional delay version of stereoizer from instruments.lib
 fstereoizer(periodDuration) = _ <: _,widthdelay : stereopanner
     with {
-        W = hslider("v:Spat/spatial width", 0.5, 0, 1, 0.01);
-        A = hslider("v:Spat/pan angle", 0.6, 0, 1, 0.01);
+        W = 0.5;
+        A = 0.6;
         widthdelay = de.fdelay(4096,W*periodDuration/2);
         stereopanner = _,_ : *(1.0-A), *(A);
     };

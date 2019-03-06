@@ -280,9 +280,11 @@ public:
                 analogWriteNI(context, 0, ((int)fBelaPin) - kANALOG_OUT_0, (*fZone - fMin)/(fRange+fMin));
                 break;
             case kKEY:
-                *fZone = powf(2, gKey / 12.f) * fMin;
+                *fZone = powf(2, (gKey - 69.f) / 12.f) * 440.f;
                 break;
             case kPOS:
+                *fZone = gPos;
+                 break;
             case kGATE:
             case kPERC:
             case kGAIN:

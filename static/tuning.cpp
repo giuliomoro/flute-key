@@ -138,7 +138,7 @@ static TuningData gTuning4Down[] = {
 {0.85, -2.53, 56.72},
 {0.9, -3.06, 56.48},
 {0.95, -3.56, 56.24},
-{1.00, -4.00, 56.00}, // was 4.02, rounded because now that is handled by fixTuning
+{1.00, -4.00, 56.00}, // was -4.02, rounded because now that is handled by fixTuning
 };
 void getEmbFreq(int range, float idx, float& freq, float& emb)
 {
@@ -191,27 +191,30 @@ void getEmbFreq(int range, float idx, float& freq, float& emb)
 	emb -= 1;
 }
 
-/* fit a straight line to the experimental points in Matlab
-x = [36, 35.92
-42, 41.91
-48, 47.87
-54, 53.84
-60, 59.80
-66, 65.75
-72, 71.68
-78, 77.60
-84, 83.55];
+/* fit a parabola to the experimentally-obtained points in Matlab
+x = [
+48, 0.07
+54, 0.09
+60, 0.125
+66, 0.17
+72, 0.23
+78, 0.32
+];
+
 poly = polyfit(x(:,1), x(:,2), 1);
 */
 
-// values computed by the Matlab code above
-float tuningCorrectionM = 0.99200000;
-float tuningCorrectionY0 = 0.24888889;
+// values computed by the Matlab code above. Only reliable within the given range
+static float tuningCorrectionCoefficients[] = {0.00022321, -0.01995833, 0.51550000};
 
 float fixTuning(float nominalFreq, float pressure)
 {
-	float m = tuningCorrectionM;
-	float y0 = tuningCorrectionY0;
 	float x = nominalFreq;
-	return m * x + y0;
+	float a = tuningCorrectionCoefficients[0];
+	float b = tuningCorrectionCoefficients[1];
+	float c = tuningCorrectionCoefficients[2];
+	float correction = a * x*x + b *x + c;
+	float out = correction + nominalFreq;
+	//rt_printf("tuning: %f %f at %f\n", nominalFreq, out, pressure);
+	return out;
 }

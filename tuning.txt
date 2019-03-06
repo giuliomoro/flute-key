@@ -1,14 +1,47 @@
 
-36, 35.92
-42, 41.91
-48, 47.87
-54, 53.84
-60, 59.80
-66, 65.75
-72, 71.68
-78, 77.60
-84, 83.55
+tuning across the octaves
 
+pressure = 1.2
+reqeuestedPitch, realPitch
+48, 47.93
+54, 53.91
+60, 59.88
+66, 65.83
+72, 71.77
+78, 77.69
+84, 83.37 
+
+presure = 1.2
+requestedPitch, correction
+48, 0.07
+54, 0.09
+60, 0.125
+66, 0.17
+72, 0.23
+78, 0.32
+84, 0.56 // pressure lowered to 1.1
+
+
+
+tuning as a dependency of pressure.
+C 60, with a base frequency offset of 0.125, which yields a 60.00 at pressure = 1.2
+pressure, freq, out
+0.85, 0.01, 60.00
+0.9, 0.035, 60.00
+0.95, 0.065, 60.00
+1.0, 0.083, 60.00
+1.05, 0.073, 60.00
+1.1, 0.053, 60.00
+1.15, 0.023, 60.00
+1.2, 0, 60.00
+1.25, -0.015, 60.00
+1.3, -0.02, 60.00
+1.35, -0.03, 60.00
+1.4, -0.037, 60.00
+1.45, -0.043, 60.00
+1.5, -0.03, 60.00
+1.55, -0.03, 60.00
+1.6, -0.03, 60.00
 
 at 60.2, pressure 0.978,  effect of embouchure:
 
@@ -120,7 +153,7 @@ at 60.085, pressure 1.4, effect of embouchure
 
 at 60.125, pressure 1.2, effect of embouchure
 
-half step bend up
+1 half step up
 
 emb, freq, out
 1.0, 0, 60
@@ -131,7 +164,7 @@ emb, freq, out
 1.05, 0.666, 60.86
 1.00, 1, 61
 
-whole step up
+2 half step up
 
 emb, freq, out
 
