@@ -11,7 +11,8 @@ extern float gGain;
 extern float gAux;
 float gPercFlag;
 
-float gAnalogInRead;
+float gAnalogIn0Read;
+float gAnalogIn1Read;
 
 #define SCOPE
 #define SCANNER
@@ -141,9 +142,10 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		count++;
 	}
 	//scope.log(buffer[59], buffer[60], buffer[61]);
+	keyboardState.setPositionCrossFadeDip(gAnalogIn1Read);
 	keyboardState.render(buffer, keyPositionTrackers, firstKey, lastKey);
 	float pressure = keyboardState.getPosition();
-	float expo = gAnalogInRead * 2.f + 0.5;
+	float expo = gAnalogIn0Read * 2.f + 0.5;
 	if(pressure <= 0)
 		pressure = 0;
 	else if(pressure <= 1)
@@ -462,7 +464,8 @@ unsigned int gSampleCount = 0;
 DR dr(44100);
 void render2(BelaContext *context, void *userData)
 {
-	gAnalogInRead = analogRead(context, 0, 0);
+	gAnalogIn0Read = analogReadNI(context, 0, 0);
+	gAnalogIn1Read = analogReadNI(context, 0, 1);
 	float* audioIn = (float*)context->audioIn;
 	for(unsigned int n = 0; n < context->audioFrames; ++n)
 	{
