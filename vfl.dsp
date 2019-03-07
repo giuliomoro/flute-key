@@ -29,7 +29,7 @@ typeModulation = nentry("h:Physical_and_Nonlinearity/h:Nonlinear_Filter_Paramete
 2=theta is modulated by the squared incoming signal; 3=theta is modulated by a sine wave of frequency freqMod;
 4=theta is modulated by a sine wave of frequency freq;]",0,0,4,1);
 nonLinearity = hslider("h:Physical_and_Nonlinearity/h:Nonlinear_Filter_Parameters/Nonlinearity 
-[3][tooltip:Nonlinearity factor (value between 0 and 1)]",0.12,0,1,0.01);
+[3][tooltip:Nonlinearity factor (value between 0 and 1)][BELA:NONLINEARITY]",0.12,0,1,0.01);
 frequencyMod = hslider("h:Physical_and_Nonlinearity/h:Nonlinear_Filter_Parameters/Modulation_Frequency 
 [3][unit:Hz][tooltip:Frequency of the sine wave for the modulation of theta (works if Modulation Type=3)]",220,20,1000,0.1);
 nonLinAttack = hslider("h:Physical_and_Nonlinearity/v:Nonlinear_Filter_Parameters/Nonlinearity Attack
@@ -111,7 +111,8 @@ stereo = fstereoizer(ma.SR/freq);
 //----------------------- Algorithm implementation ----------------------------
 
 //Pressure envelope
-env1 = en.adsr(env1Attack,env1Decay,0.9,env1Release,(gate | pressureEnvelope))*pressure*1.1;
+//env1 = en.adsr(env1Attack,env1Decay,0.9,env1Release,(gate | pressureEnvelope))*pressure*1.1;
+env1 = pressure*1.1*(gPerc*2 + 0.9);
 
 //Global envelope
 env2 = en.asr(env2Attack,1,env2Release,gate)*0.5;
@@ -127,5 +128,5 @@ flow = env1 + breath*breathAmp + vibrato;
 
 //instrReverb is declared in instruments.lib
 audioInputGain = 1;
-process =  audioInputGain*_ :(   (_ <:(_,_)),_ : _ * (feedBack2) + ( flow + _ * (feedBack1) + _: embouchureDelay : poly)  : reflexionFilter)~(boreDelay : NLFM) : *(env2)*gain : fi.dcblocker: stereo : instrReverb;
+process =  audioInputGain*_ :(   (_ <:(_,_)),_ : _ * (feedBack2) + ( flow + _ * (feedBack1) + _: embouchureDelay : poly)  : reflexionFilter)~(boreDelay : NLFM) : *(env2)*gain : fi.dcblocker <: instrReverb :> _, 0;
 

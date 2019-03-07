@@ -201,7 +201,7 @@ x = [
 78, 0.32
 ];
 
-poly = polyfit(x(:,1), x(:,2), 1);
+poly = polyfit(x(:,1), x(:,2), 2);
 */
 
 // values computed by the Matlab code above. Only reliable within the given range
@@ -217,4 +217,38 @@ float fixTuning(float nominalFreq, float pressure)
 	float out = correction + nominalFreq;
 	//rt_printf("tuning: %f %f at %f\n", nominalFreq, out, pressure);
 	return out;
+}
+
+
+/*
+Fit a straight line to the experimentally-computed values in Matlab
+we assume 0.12 for values <=76
+x = [
+76, 0.12, 76.00 % this actually modified from the original 0.122, in order to maintain continuity
+78, 0.114, 78.00
+80, 0.108, 79.99
+82, 0.100, 81.99
+83, 0.096, 82.99
+84, 0.093, 83.99
+];
+
+poly = polyfit(x(:,1), x(:,2), 1);
+plot(x(:,1), [x(:,2) polyval(poly, x(:,1)])
+*/
+// values computed by the Matlab code above:
+static float nonLinearityCoefficients[] = {-0.0034421052631579f, 0.382256140350878f};
+static float nonLinearityAtLow = 0.12;
+//static float nonLinearityAdjustmentStarts = 76.1906; // roots([poly(1), poly(2)-0.12])
+static float nonLinearityAdjustmentStarts = 74; // empirically, this seems to work better
+float getNonLinearity(float freq)
+{
+	if(freq <= nonLinearityAdjustmentStarts)
+		return nonLinearityAtLow;
+	float m = nonLinearityCoefficients[0];
+	float y0 = nonLinearityCoefficients[1];
+	float x = freq;
+	float y = m * x + y0 - 0.03; // a slight empirical offset
+	y = y > nonLinearityAtLow ? nonLinearityAtLow : y;
+	//rt_printf("for %f, %f\n", x, y);
+	return y;
 }

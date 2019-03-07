@@ -5,6 +5,7 @@
 #include "KeyboardState.h"
 extern float gKey;
 extern float gPos;
+extern float gNonLinearity;
 extern float gGate;
 extern float gPerc;
 extern float gGain;
@@ -43,26 +44,6 @@ std::vector<std::vector<float>> gPlaybackBuffers;
 int gStartPlay = -1;
 #endif /* FILE_PLAYBACK */
 
-const unsigned int attenuationStart = 60;
-float slope = 50;
-
-float getGain(float key)
-{
-	if(key < attenuationStart)
-		return 1;
-	return 1.f + 10.f*(key - attenuationStart)/slope;
-}
-float getMaxPressure(float key)
-{
-	if(key < attenuationStart)
-		return 1;
-	return 1.f - (key - attenuationStart)/slope;
-}
-
-float positionToPressure(float idx)
-{
-	return idx;
-}
 
 class DR
 {
@@ -297,27 +278,12 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		}
 	}
 	float maxPressureAtLow = 1.3f/1.9f;
-	// higher notes don't speak with too much pressure in one go. The easy way is to just rescale them
-	// although it would be better TODO: limit the slew rate at high pitches
-	maxPressureAtLow *= getMaxPressure(keyboardState.getKey());
-	{
-		float key  = keyboardState.getKey() + bendFreq;
-		rt_printf("getMaxPressure: %f, getGain: %f\n", getMaxPressure(key), getGain(key));
-	}
 	const float pressureScaleSmoother = 0.9;
 	float targetPressureScale = highPressure ? 1 : maxPressureAtLow;
 	static float oldPressureScale;
 	float pressureScale = targetPressureScale * (1.f - pressureScaleSmoother) + pressureScaleSmoother * oldPressureScale;
 	oldPressureScale = pressureScale;
 	float candidatePos = pressure * pressureScale;
-
-	const float maxGain = 0.3;
-	float aboveThreshold = constrain(candidatePos - maxPressureAtLow, 0, 1);
-	float gainNormalized = (1.f - 1.3f*(sqrtf(aboveThreshold)));
-	gainNormalized = constrain(gainNormalized, 0, 1);
-	float realKey = keyboardState.getKey();
-	if(0 && (count % 50 == 0))
-		rt_printf("candidatePos: %.4f, key: %4d, other: %2d, idx: %.4f, emb: %.4f, freq: %.4f\n", candidatePos, keyboardState.getKey(), keyboardState.getOtherKey(), idx, gAux, bendFreq);
 
 	static float lastPerc = 0;
 	float newPerc = keyboardState.getPercussiveness();
@@ -328,8 +294,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		gPerc *= gPerc;
 #ifdef FILE_PLAYBACK
 		static int nextBuffer;
-		gStartPlay = nextBuffer;
 		static int thisBuffer = 0;
+		gStartPlay = nextBuffer;
 		thisBuffer++;
 		if(thisBuffer == 1)
 		{
@@ -340,7 +306,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			nextBuffer = 0;
 #endif /* FILE_PLAYBACK */
 	}
-	gPerc *= 0.95f;
 	lastPerc = newPerc;
 	float posThreshold = 0.13;
 	if(candidatePos < posThreshold)
@@ -349,50 +314,41 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		candidatePos = (candidatePos - posThreshold) / (1.f - posThreshold);
 	static float pastPos = 0;
 
-	// avoid clicks:
-	const float clickThreshold = 0.05;
-	const float clickSmoothAlpha = 0.92;
 	candidatePos = candidatePos * 1.4f + 0.5f;
+
+	// avoid clicks:
+	const float clickThreshold = 0.06;
+	const float clickSmoothAlpha = 0.90;
+	const float smoothingEndThreshold = 0.01;
+	static bool isSmoothingPosition = false;
 	pastPos = gPos;
-	if(std::abs(candidatePos - pastPos) > clickThreshold)
-		gPos = gPos * clickSmoothAlpha + candidatePos * (1.f - clickSmoothAlpha);
-	else
+	if(!isSmoothingPosition && std::abs(candidatePos - pastPos) > clickThreshold)
+	{
+		isSmoothingPosition = true;
+	}
+	if(isSmoothingPosition && std::abs(candidatePos - pastPos) < smoothingEndThreshold)
+	{
+		isSmoothingPosition = false;
+	}
+
+	if(isSmoothingPosition) {
+		 gPos = gPos * clickSmoothAlpha + candidatePos * (1.f - clickSmoothAlpha);
+	} else {
 		gPos = candidatePos;
+	}
 	//gPos = 1.2; // use this to test tuning
 	pastPos = gPos;
-	gGain = maxGain * gainNormalized;
-	gKey = fixTuning(realKey + bendFreq + 12, gPos);
 	gAux = 1.f + bendEmbouchureOffset;
 	gGate = 1;
+	const float maxGain = 0.3;
+	float realKey = keyboardState.getKey();
+	gGain = maxGain;
+	gKey = fixTuning(realKey + bendFreq + 12, gPos);
+	// higher notes don't speak with too much pressure in one go, for high
+	// nonLinearity values. Therefore, we adjust nonLinearity with the
+	// frequency.
+	gNonLinearity = getNonLinearity(gKey);
 
-	//printing
-	{
-		static int count = 0;
-		count++;
-		int newKey = keyboardState.getKey();
-		int newOtherKey = keyboardState.getOtherKey();
-		static int oldKey = 0;
-		static int oldOtherKey = 0;
-		if( (newKey != oldKey && newKey != 0)
-&& (newOtherKey != oldOtherKey && newOtherKey != 0)
-				)
-		{
-			if(0)
-			rt_printf("perc: %6.4f, bend: %6.3f (%3d at %6.3f %50s), key: %3d, %6.3f, %s\n",
-					gPerc,
-					keyboardState.getBend(),
-					keyboardState.getOtherKey(),
-					keyboardState.getOtherPosition(),
-					statesDesc[keyPositionTrackers[keyboardState.getOtherKey()].currentState()].c_str(),
-					keyboardState.getKey(),
-					keyboardState.getPosition(),
-					statesDesc[keyPositionTrackers[keyboardState.getKey()].currentState()].c_str()
-				 );
-			count = 0;
-		}
-		oldKey = newKey;
-		oldOtherKey = newOtherKey;
-	}
 	return;
 }
 

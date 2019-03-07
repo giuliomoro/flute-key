@@ -89,6 +89,7 @@ using namespace std;
 
 float gKey;
 float gPos;
+float gNonLinearity;
 float gGate;
 float gPerc;
 float gGain;
@@ -96,6 +97,7 @@ float gAux;
 float* gExterns[] = {
     &gKey,
     &gPos,
+	&gNonLinearity,
     &gGate,
     &gPerc,
     &gGain,
@@ -140,6 +142,7 @@ const char* const pinNamesStrings[] =
     "ANALOG_OUT_8",
     "KEY",
     "POS",
+	"NONLINEARITY",
     "GATE",
     "PERC",
     "GAIN",
@@ -185,6 +188,7 @@ enum EInOutPin
     kANALOG_OUT_8,
     kKEY,
     kPOS,
+	kNONLINEARITY,
     kGATE,
     kPERC,
     kGAIN,
@@ -285,6 +289,7 @@ public:
             case kPOS:
                 *fZone = gPos;
                  break;
+			case kNONLINEARITY:
             case kGATE:
             case kPERC:
             case kGAIN:
