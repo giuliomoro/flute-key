@@ -227,20 +227,21 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 					embNormalized = sqrtf(embNormalized);
 					lowStartEmb = bendEmbouchureOffset;
 					lowStartIdx = idx;
-					rt_fprintf(stderr, "bendState from transitioning to low\n");
-					rt_fprintf(stderr, "lowStartEmb: %.4f, lowStartIdx: %.4f\n", lowStartEmb, lowStartIdx);
+					rt_fprintf(stderr, "%d bendState from transitioning to low\n", count);
+					//rt_fprintf(stderr, "lowStartEmb: %.4f, lowStartIdx: %.4f\n", lowStartEmb, lowStartIdx);
 				}
 			}
 
 			if(kBendStateLow == bendState)
 			{
+#ifdef LOOKUP
+				bendEmbouchureOffset = emb;
+				bendFreq = freq;
+#else /* LOOKUP */
 				embNormalized = sqrtf(embNormalized);
 				bendEmbouchureOffset = embNormalized * embouchureRange;
 				bendEmbouchureOffset = map(idx, lowStartIdx, 1, lowStartEmb, 0);
 				bendEmbouchureOffset = constrain(bendEmbouchureOffset, -0.8, 1);
-#ifdef LOOKUP
-				bendEmbouchureOffset = emb;
-				bendFreq = freq;
 #endif /* LOOKUP */
 				//rt_printf("ha idx: %f, bendEmbouchureOffset: %f\n", idx, bendEmbouchureOffset);
 			} else if(kBendStateTransitioning == bendState) {
@@ -256,11 +257,9 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 					bendState = kBendStateHigh;
 					bendStateHighKey = keyboardState.getOtherKey();
 					bendStateHighKeyInitialPos = buffer[bendStateHighKey];
-					rt_fprintf(stderr, "bendState from transitioning to high (on %d)\n", bendStateHighKey);
+					rt_fprintf(stderr, "%d bendState from transitioning to high (on %d)\n", count, bendStateHighKey);
 				}
 				bendEmbouchureOffset = transitioningEmbouchureOffset;
-
-
 			}
 		}
 		if (kBendStateHigh == bendState) {
@@ -275,7 +274,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	const float pressureOffset = 0.5;
 	const float absoluteMaxPressure = pressureRange + pressureOffset + 0.5;
 	const float maxPressureAtLow = 1.3f / 1.9f;
-	const float gainAtHighPressure = 0.3;
+	const float gainAtHighPressure = 0.2;
 	// when we are in highPressure mode, we change the overall pressure range and compensate for the gain (smoothed by Faust)
 	float pressureScale;
 	float gain;
@@ -287,14 +286,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		pressureScale = maxPressureAtLow;
 		gain = 1;
 	}
-
-	// Here we smooth it to avoid clicks due to this
-	// ACTUALLY WE DON'T NEED TO BECAUSE IT'S SMOOTHED GLOBALLY BELOW ANYHOW
-	//const float pressureScaleSmoother = 0.9;
-	//float targetPressureScale = highPressure ? 1 : maxPressureAtLow;
-	//static float oldPressureScale;
-	//float pressureScale = targetPressureScale * (1.f - pressureScaleSmoother) + pressureScaleSmoother * oldPressureScale;
-	//oldPressureScale = pressureScale;
 
 	float pressure = keyboardState.getPosition();
 	float expo = gAnalogIn0Read * 2.f + 0.5;
@@ -324,17 +315,13 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	if(!isSmoothingPosition && std::abs(candidatePressure - pastPos) > clickThreshold)
 	{
 		isSmoothingPosition = true;
-		rt_printf("IsSmoothing\n");
 	}
 	if(!isKeyBottom && isSmoothingPosition && std::abs(candidatePressure - pastPos) < smoothingEndThreshold)
 	{
 		isSmoothingPosition = false;
-		rt_printf("====stopped\n");
 	}
 	if(isKeyBottom)
 	{
-		if(!isSmoothingPosition)
-			rt_printf("Smoothing key bottom\n");
 		isSmoothingPosition = true;
 	}
 
@@ -351,7 +338,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	if(newPerc != lastPerc && newPerc)
 	{
 		gPerc = newPerc;
-		gPerc *= 19.f;
+		gPerc *= 16.f;
 		gPerc *= gPerc;
 #ifdef FILE_PLAYBACK
 		static int nextBuffer;
