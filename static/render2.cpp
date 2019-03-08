@@ -17,15 +17,23 @@ extern float gEmbRatio;
 float gPercFlag;
 float gAnalogIn0Read;
 float gAnalogIn1Read;
+float gAnalogIn2Read;
+uint64_t gTimestamp;
 
 #define SCOPE
 #define SCANNER
 #define FILE_PLAYBACK
 #define LOOKUP
+#define LOGGING
 
 #ifdef LOOKUP
 #include "tuning.h"
 #endif /* LOOKUP */
+#ifdef LOGGING
+#include <WriteFile.h>
+WriteFile gSensorFile;
+WriteFile gAudioFile;
+#endif /* LOGGING */
 #ifdef SCOPE
 #include <Scope.h>
 Scope scope;
@@ -46,7 +54,6 @@ std::vector<KeyPositionTracker> keyPositionTrackers;
 std::vector<std::vector<float>> gPlaybackBuffers;
 int gStartPlay = -1;
 #endif /* FILE_PLAYBACK */
-
 
 class DR
 {
@@ -132,6 +139,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	static float bendEmbouchureOffset = 0;
 	float idx = 0;
 	bool highPressure = false;
+	static int bendState = 0;
 	if(0)
 	{
 		// basic bending
@@ -158,7 +166,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		const float embClip = 1.2;
 		const float bendStateHighToLowThreshold = 0.6;
 
-		static int bendState = kBendStateLow;
 		static float transitioningEmbouchureOffset = 0;
 		static float transitionStartEmb;
 		static float transitionStartIdx;
@@ -206,7 +213,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			embNormalized = embNormalized > 1 ? 1 : embNormalized;
 
 			embNormLeaky = embNormalized * (1.f-leakyAlpha) + embNormLeaky * leakyAlpha;
-			rt_printf("%d_ leaky: %.5f\n", count, embNormLeaky);
+			if(count % 20 == 0)
+				rt_printf("%d_ leaky: %.5f\n", count, embNormLeaky);
 			if(embNormLeaky > kLeakyLowToTransThreshold)
 			{
 				if(kBendStateLow == bendState)
@@ -372,11 +380,21 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	// frequency.
 	gNonLinearity = getNonLinearity(gKey, gEmbRatio);
 
+	float logs[] = {(float)gTimestamp, (float)count, gKey, gPos, gNonLinearity, gGate, gPerc, gGain, gEmbRatio, (float)bendState, gAnalogIn0Read, gAnalogIn1Read, gAnalogIn2Read};
+	gSensorFile.log(logs, sizeof(logs)/sizeof(float));
+	gSensorFile.log(buffer + firstKey, lastKey - firstKey + 1);
 	return;
 }
 
 bool setup2(BelaContext *context, void *userData)
 {
+#ifdef LOGGING
+	  gAudioFile.init("/root/audio_log.bin");
+	  gAudioFile.setFileType(kBinary);
+	  gSensorFile.init("/root/sensor_log.bin");
+	  gSensorFile.setFileType(kBinary);
+#endif /* LOGGING */
+
 #ifdef FILE_PLAYBACK
 	std::vector<std::string> files;
 	for(unsigned int n = 4; n <= 6; ++n)
@@ -448,6 +466,7 @@ void render2(BelaContext *context, void *userData)
 {
 	gAnalogIn0Read = analogReadNI(context, 0, 0);
 	gAnalogIn1Read = analogReadNI(context, 0, 1);
+	gAnalogIn2Read = analogReadNI(context, 0, 2);
 	float* audioIn = (float*)context->audioIn;
 	for(unsigned int n = 0; n < context->audioFrames; ++n)
 	{
@@ -486,6 +505,10 @@ void renderPost(BelaContext *context, void *userData)
 		unsigned int ch = 0;
 		scope.log(context->audioOut[context->audioFrames * ch + f], gPos);
 	}
+	float timestamp = gTimestamp;
+	gAudioFile.log(&timestamp, 1);
+	gAudioFile.log(context->audioOut, context->audioFrames);
+	gTimestamp += context->audioFrames;
 }
 
 void cleanup2(BelaContext *context, void *userData)
