@@ -166,18 +166,19 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		static float lowStartIdx;
 		static int bendStateHighKey;
 		static float bendStateHighKeyInitialPos;
-		if(bendState == kBendStateHigh)
+		if(kBendStateHigh == bendState)
 		{
 			if(buffer[bendStateHighKey] < bendStateHighToLowThreshold)
 			{
 				bendState = kBendStateLow;
-				rt_fprintf(stderr, "bendState reset to low\n");
+				rt_fprintf(stderr, "%d bendState reset to low\n", count);
 				lowStartEmb = 0;
 				lowStartIdx = 0;
 			}
 		}
 
-		float alpha = 0.99;
+		float leakyAlpha = 0.99;
+		float kLeakyLowToTransThreshold = 0.95;
 		static float embNormLeaky = 0;
 		float bendRange = keyboardState.getBendRange(); //positive (bending up) or negative (bending down)
 		if(std::abs(bendRange) < 0.05) {
@@ -200,9 +201,9 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			embNormalized = embNormalized < 0 ? 0 : embNormalized;
 			embNormalized = embNormalized > 1 ? 1 : embNormalized;
 
-			embNormLeaky = embNormalized * (1.f-alpha) + embNormLeaky * alpha; 
-			//rt_printf("leaky: %.5f\n", embNormLeaky);
-			if(embNormLeaky > 0.9)
+			embNormLeaky = embNormalized * (1.f-leakyAlpha) + embNormLeaky * leakyAlpha;
+			rt_printf("%d_ leaky: %.5f\n", count, embNormLeaky);
+			if(embNormLeaky > kLeakyLowToTransThreshold)
 			{
 				if(kBendStateLow == bendState)
 				{
@@ -215,8 +216,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 					transitionStartEmb = bendEmbouchureOffset;
 #endif /* LOOKUP */
 					transitionStartIdx = idx;
-					rt_fprintf(stderr, "bendState from low to transitioning\n");
-					rt_fprintf(stderr, "transitionStartEmb: %.4f, transitionStartIdx: %.4f\n", transitionStartEmb, transitionStartIdx);
+					rt_fprintf(stderr, "%d bendState from low to transitioning\n", count);
+					//rt_fprintf(stderr, "transitionStartEmb: %.4f, transitionStartIdx: %.4f\n", transitionStartEmb, transitionStartIdx);
 				}
 			} else
 			if(embNormLeaky < 0.3)
