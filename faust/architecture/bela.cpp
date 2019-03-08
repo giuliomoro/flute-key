@@ -93,7 +93,7 @@ float gNonLinearity;
 float gGate;
 float gPerc;
 float gGain;
-float gAux;
+float gEmbRatio;
 float* gExterns[] = {
     &gKey,
     &gPos,
@@ -101,7 +101,7 @@ float* gExterns[] = {
     &gGate,
     &gPerc,
     &gGain,
-    &gAux,
+    &gEmbRatio,
 };
 
 const char* const pinNamesStrings[] =
@@ -146,7 +146,7 @@ const char* const pinNamesStrings[] =
     "GATE",
     "PERC",
     "GAIN",
-    "AUX",
+    "EMBRATIO",
 };
 
 enum EInOutPin
@@ -192,7 +192,7 @@ enum EInOutPin
     kGATE,
     kPERC,
     kGAIN,
-    kAUX,
+    kEMBRATIO,
     kNumInputPins
 };
 
@@ -295,8 +295,8 @@ public:
             case kGAIN:
                 *fZone = *gExterns[fBelaPin - kKEY] * fRange + fMin;
                  break;
-            case kAUX:
-                *fZone = gAux;
+            case kEMBRATIO:
+                *fZone = gEmbRatio;
                  break;
                 
             default:

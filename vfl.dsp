@@ -34,7 +34,7 @@ frequencyMod = hslider("h:Physical_and_Nonlinearity/h:Nonlinear_Filter_Parameter
 [3][unit:Hz][tooltip:Frequency of the sine wave for the modulation of theta (works if Modulation Type=3)]",220,20,1000,0.1);
 nonLinAttack = hslider("h:Physical_and_Nonlinearity/v:Nonlinear_Filter_Parameters/Nonlinearity Attack
 [3][unit:s][Attack duration of the nonlinearity]",0,0,2,0.01);
-embRatio = hslider("h:Physical_and_Nonlinearity/h:embouchure_ratio[BELA:AUX]", 1.0, 0.0, 8.0, 0.01) : si.smooth(0.998);
+embRatio = hslider("h:Physical_and_Nonlinearity/h:embouchure_ratio[BELA:EMBRATIO]", 1.0, 0.0, 8.0, 0.01) : si.smooth(0.998);
 
 vibratoFreq = hslider("h:Envelopes_and_Vibrato/h:Vibrato_Parameters/Vibrato_Freq 
 [4][unit:Hz]",5,1,15,0.1);
@@ -128,5 +128,5 @@ flow = env1 + breath*breathAmp + vibrato;
 
 //instrReverb is declared in instruments.lib
 audioInputGain = 1;
-process =  audioInputGain*_ :(   (_ <:(_,_)),_ : _ * (feedBack2) + ( flow + _ * (feedBack1) + _: embouchureDelay : poly)  : reflexionFilter)~(boreDelay : NLFM) : *(env2)*gain : fi.dcblocker <: instrReverb :> _, 0;
+process =  audioInputGain*_ :(   (_ <:(_,_)),_ : _ * (feedBack2) + ( flow + _ * (feedBack1) + _: embouchureDelay : poly)  : reflexionFilter)~(boreDelay : NLFM) : *(env2)*gain : fi.dcblocker <: instrReverb :> co.limiter_1176_R4_mono : _, 0;
 

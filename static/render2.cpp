@@ -3,15 +3,18 @@
 #include <algorithm>
 #include <cmath>
 #include "KeyboardState.h"
+
+// communicate to faust
 extern float gKey;
 extern float gPos;
 extern float gNonLinearity;
 extern float gGate;
 extern float gPerc;
 extern float gGain;
-extern float gAux;
-float gPercFlag;
+extern float gEmbRatio;
 
+// communicate between keys thread and render
+float gPercFlag;
 float gAnalogIn0Read;
 float gAnalogIn1Read;
 
@@ -122,18 +125,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		}
 		count++;
 	}
-	//scope.log(buffer[59], buffer[60], buffer[61]);
-	keyboardState.setPositionCrossFadeDip(gAnalogIn1Read);
+	keyboardState.setPositionCrossFadeDip(gAnalogIn1Read * 4.f);
 	keyboardState.render(buffer, keyPositionTrackers, firstKey, lastKey);
-	float pressure = keyboardState.getPosition();
-	float expo = gAnalogIn0Read * 2.f + 0.5;
-	if(pressure <= 0)
-		pressure = 0;
-	else if(pressure <= 1)
-		pressure = powf(pressure, expo);
-	else if(pressure > 1)
-		pressure = powf(pressure, 2); // fixed curve for aftertouch
-	pressure = pressure > 1 ? 1 : pressure; // TODO: do proper key-bottom calibration and remove this one
 
 	float bendFreq = 0;
 	static float bendEmbouchureOffset = 0;
@@ -277,20 +270,88 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			highPressure = true;
 		}
 	}
-	float maxPressureAtLow = 1.3f/1.9f;
-	const float pressureScaleSmoother = 0.9;
-	float targetPressureScale = highPressure ? 1 : maxPressureAtLow;
-	static float oldPressureScale;
-	float pressureScale = targetPressureScale * (1.f - pressureScaleSmoother) + pressureScaleSmoother * oldPressureScale;
-	oldPressureScale = pressureScale;
-	float candidatePos = pressure * pressureScale;
+	const float posThreshold = 0.13; // ignore values below this
+	const float pressureRange = 1.4;
+	const float pressureOffset = 0.5;
+	const float absoluteMaxPressure = pressureRange + pressureOffset + 0.5;
+	const float maxPressureAtLow = 1.3f / 1.9f;
+	const float gainAtHighPressure = 0.3;
+	// when we are in highPressure mode, we change the overall pressure range and compensate for the gain (smoothed by Faust)
+	float pressureScale;
+	float gain;
+	if(highPressure)
+	{
+		pressureScale = 1;
+		gain = gainAtHighPressure;
+	} else {
+		pressureScale = maxPressureAtLow;
+		gain = 1;
+	}
 
+	// Here we smooth it to avoid clicks due to this
+	// ACTUALLY WE DON'T NEED TO BECAUSE IT'S SMOOTHED GLOBALLY BELOW ANYHOW
+	//const float pressureScaleSmoother = 0.9;
+	//float targetPressureScale = highPressure ? 1 : maxPressureAtLow;
+	//static float oldPressureScale;
+	//float pressureScale = targetPressureScale * (1.f - pressureScaleSmoother) + pressureScaleSmoother * oldPressureScale;
+	//oldPressureScale = pressureScale;
+
+	float pressure = keyboardState.getPosition();
+	float expo = gAnalogIn0Read * 2.f + 0.5;
+	if(pressure <= 0)
+		pressure = 0;
+	else if(pressure <= 1)
+		pressure = powf(pressure, expo); // some e
+	else if(pressure > 1)
+		pressure = powf(pressure, 6); // fixed curve for aftertouch, very steep
+	float candidatePressure = pressure * pressureScale;
+
+	if(candidatePressure < posThreshold)
+		candidatePressure = 0;
+	else
+		candidatePressure = (candidatePressure - posThreshold) / (1.f - posThreshold);
+
+	candidatePressure = candidatePressure * pressureRange + pressureOffset;
+	candidatePressure = candidatePressure > absoluteMaxPressure ? absoluteMaxPressure : candidatePressure; // clip!
+
+	// avoid clicks in the pressure, but also avoid smoothing always: smoothing always is for birds
+	const float clickThreshold = 0.06;
+	const float clickSmoothAlpha = 0.90;
+	const float smoothingEndThreshold = 0.01;
+	static bool isSmoothingPosition = false;
+	bool isKeyBottom = candidatePressure > 0.95;
+	float pastPos = gPos;
+	if(!isSmoothingPosition && std::abs(candidatePressure - pastPos) > clickThreshold)
+	{
+		isSmoothingPosition = true;
+		rt_printf("IsSmoothing\n");
+	}
+	if(!isKeyBottom && isSmoothingPosition && std::abs(candidatePressure - pastPos) < smoothingEndThreshold)
+	{
+		isSmoothingPosition = false;
+		rt_printf("====stopped\n");
+	}
+	if(isKeyBottom)
+	{
+		if(!isSmoothingPosition)
+			rt_printf("Smoothing key bottom\n");
+		isSmoothingPosition = true;
+	}
+
+	if(isSmoothingPosition) {
+		 gPos = gPos * clickSmoothAlpha + candidatePressure * (1.f - clickSmoothAlpha);
+	} else {
+		gPos = candidatePressure;
+	}
+	//gPos = 1.2; // use this to ignore the above and test tuning
+
+	// handle percussiveness
 	static float lastPerc = 0;
 	float newPerc = keyboardState.getPercussiveness();
 	if(newPerc != lastPerc && newPerc)
 	{
 		gPerc = newPerc;
-		gPerc *= 20.f;
+		gPerc *= 19.f;
 		gPerc *= gPerc;
 #ifdef FILE_PLAYBACK
 		static int nextBuffer;
@@ -307,54 +368,23 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 #endif /* FILE_PLAYBACK */
 	}
 	lastPerc = newPerc;
-	float posThreshold = 0.13;
-	if(candidatePos < posThreshold)
-		candidatePos = 0;
-	else 
-		candidatePos = (candidatePos - posThreshold) / (1.f - posThreshold);
-	static float pastPos = 0;
 
-	candidatePos = candidatePos * 1.4f + 0.5f;
-
-	// avoid clicks:
-	const float clickThreshold = 0.06;
-	const float clickSmoothAlpha = 0.90;
-	const float smoothingEndThreshold = 0.01;
-	static bool isSmoothingPosition = false;
-	pastPos = gPos;
-	if(!isSmoothingPosition && std::abs(candidatePos - pastPos) > clickThreshold)
-	{
-		isSmoothingPosition = true;
-	}
-	if(isSmoothingPosition && std::abs(candidatePos - pastPos) < smoothingEndThreshold)
-	{
-		isSmoothingPosition = false;
-	}
-
-	if(isSmoothingPosition) {
-		 gPos = gPos * clickSmoothAlpha + candidatePos * (1.f - clickSmoothAlpha);
-	} else {
-		gPos = candidatePos;
-	}
-	//gPos = 1.2; // use this to test tuning
-	pastPos = gPos;
-	gAux = 1.f + bendEmbouchureOffset;
+	// set the other global variables
+	gEmbRatio = 1.f + bendEmbouchureOffset;
 	gGate = 1;
 	const float maxGain = 0.3;
-	float realKey = keyboardState.getKey();
-	gGain = maxGain;
-	gKey = fixTuning(realKey + bendFreq + 12, gPos);
+	gGain = maxGain * gain;
+	gKey = fixTuning(keyboardState.getKey() + bendFreq + 12, gPos);
 	// higher notes don't speak with too much pressure in one go, for high
 	// nonLinearity values. Therefore, we adjust nonLinearity with the
 	// frequency.
-	gNonLinearity = getNonLinearity(gKey);
+	gNonLinearity = getNonLinearity(gKey, gEmbRatio);
 
 	return;
 }
 
 bool setup2(BelaContext *context, void *userData)
 {
-	printf("Setup2\n");
 #ifdef FILE_PLAYBACK
 	std::vector<std::string> files;
 	for(unsigned int n = 4; n <= 6; ++n)

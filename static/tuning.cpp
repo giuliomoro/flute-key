@@ -240,15 +240,21 @@ static float nonLinearityCoefficients[] = {-0.0034421052631579f, 0.3822561403508
 static float nonLinearityAtLow = 0.12;
 //static float nonLinearityAdjustmentStarts = 76.1906; // roots([poly(1), poly(2)-0.12])
 static float nonLinearityAdjustmentStarts = 74; // empirically, this seems to work better
-float getNonLinearity(float freq)
+float getNonLinearity(float freq, float embRatio)
 {
+	float y;
 	if(freq <= nonLinearityAdjustmentStarts)
-		return nonLinearityAtLow;
-	float m = nonLinearityCoefficients[0];
-	float y0 = nonLinearityCoefficients[1];
-	float x = freq;
-	float y = m * x + y0 - 0.03; // a slight empirical offset
-	y = y > nonLinearityAtLow ? nonLinearityAtLow : y;
+	{
+		y = nonLinearityAtLow;
+	} else {
+		float m = nonLinearityCoefficients[0];
+		float y0 = nonLinearityCoefficients[1];
+		float x = freq;
+		y = m * x + y0 - 0.03; // a slight empirical offset
+		y = y > nonLinearityAtLow ? nonLinearityAtLow : y;
+	}
+	if(embRatio > 1.85)
+		y *= 0.5f;
 	//rt_printf("for %f, %f\n", x, y);
 	return y;
 }
