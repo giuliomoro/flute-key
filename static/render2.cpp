@@ -24,7 +24,7 @@ uint64_t gTimestamp;
 #define SCANNER
 #define FILE_PLAYBACK
 #define LOOKUP
-#define LOGGING
+//#define LOGGING
 
 #ifdef LOOKUP
 #include "tuning.h"
@@ -113,6 +113,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	unsigned int key = 46;
 #endif /* SINGLE_KEY */
 	static int count;
+	if(count % 1000 == 0)
+		rt_printf("Tunables %f %f\n", gAnalogIn0Read, gAnalogIn1Read);
 	{
 		for(unsigned int n = 0; n < length; ++n)
 		{
@@ -306,11 +308,12 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 	float pressure = keyboardState.getPosition();
 	float expo = gAnalogIn0Read * 2.f + 0.5;
+	float afterTouchThreshold = 1.03;
 	if(pressure <= 0)
 		pressure = 0;
-	else if(pressure <= 1)
+	else if(pressure <= afterTouchThreshold)
 		pressure = powf(pressure, expo); // some e
-	else if(pressure > 1)
+	else if(pressure > afterTouchThreshold)
 		pressure = powf(pressure, 6); // fixed curve for aftertouch, very steep
 	float candidatePressure = pressure * pressureScale;
 
@@ -355,7 +358,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	if(newPerc != lastPerc && newPerc)
 	{
 		gPerc = newPerc;
-		gPerc *= 16.f;
+		gPerc *= 13.f;
 		gPerc *= gPerc;
 #ifdef FILE_PLAYBACK
 		static int nextBuffer;
@@ -376,7 +379,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	// set the other global variables
 	gEmbRatio = 1.f + bendEmbouchureOffset;
 	gGate = 1;
-	const float maxGain = 0.3;
+	const float maxGain = 0.2;
 	gGain = maxGain * gain;
 	gKey = fixTuning(keyboardState.getKey() + bendFreq + 12, gPos);
 	// higher notes don't speak with too much pressure in one go, for high
@@ -384,9 +387,11 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	// frequency.
 	gNonLinearity = getNonLinearity(gKey, gEmbRatio);
 
+	#ifdef LOGGING
 	float logs[] = {(float)gTimestamp, (float)count, gKey, gPos, gNonLinearity, gGate, gPerc, gGain, gEmbRatio, (float)bendState, gAnalogIn0Read, gAnalogIn1Read, gAnalogIn2Read};
 	gSensorFile.log(logs, sizeof(logs)/sizeof(float));
 	gSensorFile.log(buffer + firstKey, lastKey - firstKey + 1);
+	#endif 
 	return;
 }
 
@@ -510,8 +515,10 @@ void renderPost(BelaContext *context, void *userData)
 		scope.log(context->audioOut[context->audioFrames * ch + f], gPos);
 	}
 	float timestamp = gTimestamp;
+#ifdef LOGGING
 	gAudioFile.log(&timestamp, 1);
 	gAudioFile.log(context->audioOut, context->audioFrames);
+#endif	
 	gTimestamp += context->audioFrames;
 }
 
