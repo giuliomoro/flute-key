@@ -168,6 +168,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 		static float transitioningEmbouchureOffset = 0;
 		static float transitionStartEmb;
+		static float transitioningStartFreq;
 		static float transitionStartIdx;
 		static float lowStartEmb;
 		static float lowStartIdx;
@@ -224,10 +225,12 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 					//bendEmbouchureOffset = embNormalized * embouchureRange;
 #ifdef LOOKUP
 					transitionStartEmb = emb;
+					transitioningStartFreq = freq;
 #else /* LOOKUP */
 					transitionStartEmb = bendEmbouchureOffset;
 #endif /* LOOKUP */
 					transitionStartIdx = idx;
+
 					rt_fprintf(stderr, "%d bendState from low to transitioning\n", count);
 					//rt_fprintf(stderr, "transitionStartEmb: %.4f, transitionStartIdx: %.4f\n", transitionStartEmb, transitionStartIdx);
 				}
@@ -260,6 +263,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			} else if(kBendStateTransitioning == bendState) {
 				// keep ramping the embouchure, till we get to the high octave
 				float transitionMaxEmbIdx = 0.97;
+				bendFreq = transitioningStartFreq;
 				transitioningEmbouchureOffset = map(idx, transitionStartIdx, transitionMaxEmbIdx, transitionStartEmb, bendRange > 0 ? 1 : -0.995);
 				transitioningEmbouchureOffset = constrain(transitioningEmbouchureOffset, -1, 1);
 
