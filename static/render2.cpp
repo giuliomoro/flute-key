@@ -181,14 +181,18 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		float kLeakyLowToTransThreshold = 0.95;
 		static float embNormLeaky = 0;
 		float bendRange = keyboardState.getBendRange(); //positive (bending up) or negative (bending down)
-		if(std::abs(bendRange) < 0.05) {
-			bendEmbouchureOffset = 0;
-			lowStartEmb = 0;
-			lowStartIdx = 0;
-		} else {
+		//if(std::abs(bendRange) < 0.05) {
+			//bendEmbouchureOffset = 0;
+			//lowStartEmb = 0;
+			//lowStartIdx = 0;
+		//} else {
+		{
 			float embouchureRange = bendRange > 0 ? maxEmbouchure : minEmbouchure;
 			//rt_printf("bendRange: %f keyboardState.getBend(): %f\n", bendRange, keyboardState.getBend());
-			idx = keyboardState.getBend() / bendRange; // normalized current bend, always positive
+			if(bendRange)
+				idx = keyboardState.getBend() / bendRange; // normalized current bend, always positive
+			else
+				idx = 0;
 #ifdef LOOKUP
 			float freq, emb;
 			getEmbFreq(bendRange, idx, freq, emb);
