@@ -221,7 +221,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				//rt_printf("%d_ leaky: %.5f\n", count, embNormLeaky);
 			if(embNormLeaky > kLeakyLowToTransThreshold)
 			{
-				if(kBendStateLow == bendState)
+				if(kBendStateLow == bendState || kBendStateLow2 == bendState)
 				{
 					bendState = kBendStateTransitioning;
 					embNormalized = sqrtf(embNormalized);
@@ -234,8 +234,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 #endif /* LOOKUP */
 					transitionStartIdx = idx;
 
-					rt_fprintf(stderr, "%d bendState from low to transitioning\n", count);
-					//rt_fprintf(stderr, "transitionStartEmb: %.4f, transitionStartIdx: %.4f\n", transitionStartEmb, transitionStartIdx);
+					rt_fprintf(stderr, "%d bendState from low%s to transitioning\n", count, bendState == kBendStateLow ? "" : "2");
+					rt_fprintf(stderr, "    transitionStartEmb: %.4f, transitionStartIdx: %.4f\n", transitionStartEmb, transitionStartIdx);
 				}
 			} else
 			if(embNormLeaky < 0.3)
