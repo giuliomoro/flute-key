@@ -514,8 +514,8 @@ void renderPost(BelaContext *context, void *userData)
 		unsigned int ch = 0;
 		scope.log(context->audioOut[context->audioFrames * ch + f], gPos);
 	}
-	float timestamp = gTimestamp;
 #ifdef LOGGING
+	float timestamp = gTimestamp;
 	gAudioFile.log(&timestamp, 1);
 	gAudioFile.log(context->audioOut, context->audioFrames);
 #endif	
