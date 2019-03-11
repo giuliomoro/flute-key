@@ -23,12 +23,9 @@ uint64_t gTimestamp;
 #define SCOPE
 #define SCANNER
 #define FILE_PLAYBACK
-#define LOOKUP
-#define LOGGING
+//#define LOGGING
 
-#ifdef LOOKUP
 #include "tuning.h"
-#endif /* LOOKUP */
 #ifdef LOGGING
 #include <WriteFile.h>
 WriteFile gSensorFile;
@@ -204,10 +201,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				idx = keyboardState.getBend() / bendRange; // normalized current bend, always positive
 			else
 				idx = 0;
-#ifdef LOOKUP
 			float freq, emb;
 			getEmbFreq(bendRange, idx, freq, emb);
-#endif /* LOOKUP */
 			bendFreq = bendRange * (idx < freqRampStartIdx ? 0 
 				: (idx - freqRampStartIdx)/(1.f - freqRampStartIdx) * idx);
 			float embNormalized = idx < embPeakIdx ?
@@ -226,12 +221,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 					bendState = kBendStateTransitioning;
 					embNormalized = sqrtf(embNormalized);
 					//bendEmbouchureOffset = embNormalized * embouchureRange;
-#ifdef LOOKUP
 					transitionStartEmb = emb;
 					transitionStartFreq = freq;
-#else /* LOOKUP */
-					transitionStartEmb = bendEmbouchureOffset;
-#endif /* LOOKUP */
 					transitionStartIdx = idx;
 
 					rt_fprintf(stderr, "%d bendState from low%s to transitioning\n", count, bendState == kBendStateLow ? "" : "2");
@@ -261,16 +252,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 			if(kBendStateLow == bendState)
 			{
-#ifdef LOOKUP
 				bendEmbouchureOffset = emb;
 				bendFreq = freq;
-#else /* LOOKUP */
-				embNormalized = sqrtf(embNormalized);
-				bendEmbouchureOffset = embNormalized * embouchureRange;
-				bendEmbouchureOffset = map(idx, lowStartIdx, 1, lowStartEmb, 0);
-				bendEmbouchureOffset = constrain(bendEmbouchureOffset, -0.8, 1);
-#endif /* LOOKUP */
-				//rt_printf("ha idx: %f, bendEmbouchureOffset: %f\n", idx, bendEmbouchureOffset);
 			} else if(kBendStateLow2 == bendState) {
 				embNormalized = sqrtf(embNormalized);
 				bendEmbouchureOffset = embNormalized * embouchureRange;
