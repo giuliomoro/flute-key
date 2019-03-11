@@ -24,7 +24,7 @@ uint64_t gTimestamp;
 #define SCANNER
 #define FILE_PLAYBACK
 #define LOOKUP
-//#define LOGGING
+#define LOGGING
 
 #ifdef LOOKUP
 #include "tuning.h"
@@ -113,8 +113,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	unsigned int key = 46;
 #endif /* SINGLE_KEY */
 	static int count;
-	if(count % 1000 == 0)
-		rt_printf("Tunables %f %f\n", gAnalogIn0Read, gAnalogIn1Read);
+	//if(count % 1000 == 0)
+		//rt_printf("Tunables %f %f\n", gAnalogIn0Read, gAnalogIn1Read);
 	{
 		for(unsigned int n = 0; n < length; ++n)
 		{
@@ -157,6 +157,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		// improved bending, with embouchure
 		enum {
 			kBendStateLow,
+			kBendStateLow2,
 			kBendStateTransitioning,
 			kBendStateHigh
 		};
@@ -216,8 +217,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			embNormalized = embNormalized > 1 ? 1 : embNormalized;
 
 			embNormLeaky = embNormalized * (1.f-leakyAlpha) + embNormLeaky * leakyAlpha;
-			if(count % 20 == 0)
-				rt_printf("%d_ leaky: %.5f\n", count, embNormLeaky);
+			//if(count % 20 == 0)
+				//rt_printf("%d_ leaky: %.5f\n", count, embNormLeaky);
 			if(embNormLeaky > kLeakyLowToTransThreshold)
 			{
 				if(kBendStateLow == bendState)
@@ -241,13 +242,21 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			{
 				if(kBendStateTransitioning == bendState)
 				{
-					bendState = kBendStateLow;
+					bendState = kBendStateLow2;
 					embNormalized = sqrtf(embNormalized);
 					lowStartEmb = bendEmbouchureOffset;
 					lowStartIdx = idx;
-					rt_fprintf(stderr, "%d bendState from transitioning to low\n", count);
-					//rt_fprintf(stderr, "lowStartEmb: %.4f, lowStartIdx: %.4f\n", lowStartEmb, lowStartIdx);
+					if(lowStartIdx >= 0.95)
+						lowStartEmb = 1; // make it 0 for more fun
+						
+					rt_fprintf(stderr, "%d bendState from transitioning to low2\n", count);
+					rt_fprintf(stderr, "     lowStartEmb: %.4f, lowStartIdx: %.4f\n", lowStartEmb, lowStartIdx);
 				}
+			}
+			if(kBendStateLow2 == bendState && idx < 0.03)
+			{
+				bendState = kBendStateLow;
+				rt_fprintf(stderr, "%d bendState from low2 to low\n", count);
 			}
 
 			if(kBendStateLow == bendState)
@@ -262,6 +271,12 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				bendEmbouchureOffset = constrain(bendEmbouchureOffset, -0.8, 1);
 #endif /* LOOKUP */
 				//rt_printf("ha idx: %f, bendEmbouchureOffset: %f\n", idx, bendEmbouchureOffset);
+			} else if(kBendStateLow2 == bendState) {
+				embNormalized = sqrtf(embNormalized);
+				bendEmbouchureOffset = embNormalized * embouchureRange;
+				bendEmbouchureOffset = map(idx, lowStartIdx, 1, lowStartEmb, 0);
+				bendEmbouchureOffset = constrain(bendEmbouchureOffset, -0.8, 1);
+				bendFreq = freq;
 			} else if(kBendStateTransitioning == bendState) {
 				// keep ramping the embouchure, till we get to the high octave
 				float transitionMaxEmbIdx = 0.97;
@@ -291,8 +306,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	const float posThreshold = 0.13; // ignore values below this
 	const float pressureRange = 1.4;
 	const float pressureOffset = 0.5;
-	const float absoluteMaxPressure = pressureRange + pressureOffset + 0.5;
-	const float maxPressureAtLow = 1.3f / 1.9f;
+	const float absoluteMaxPressure = pressureRange + pressureOffset + 0.2;
+	const float maxPressureAtLow = 1.1f / 1.9f;
 	const float gainAtHighPressure = 0.2;
 	// when we are in highPressure mode, we change the overall pressure range and compensate for the gain (smoothed by Faust)
 	float pressureScale;
@@ -314,7 +329,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	else if(pressure <= afterTouchThreshold)
 		pressure = powf(pressure, expo); // some e
 	else if(pressure > afterTouchThreshold)
-		pressure = powf(pressure, 6); // fixed curve for aftertouch, very steep
+		pressure = powf(pressure, 4); // fixed curve for aftertouch, very steep
 	float candidatePressure = pressure * pressureScale;
 
 	if(candidatePressure < posThreshold)
@@ -358,6 +373,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	if(newPerc != lastPerc && newPerc)
 	{
 		gPerc = newPerc;
+		rt_printf("Perc: %f\n", gPerc);
 		gPerc *= 13.f;
 		gPerc *= gPerc;
 #ifdef FILE_PLAYBACK
