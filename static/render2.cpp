@@ -393,6 +393,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	lastPerc = newPerc;
 
 	// set the other global variables
+	bendEmbouchureOffset = constrain(bendEmbouchureOffset, -0.8, 1.2);
 	gEmbRatio = 1.f + bendEmbouchureOffset;
 	gGate = 1;
 	const float maxGain = 0.2;
