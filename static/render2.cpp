@@ -158,8 +158,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			kBendStateTransitioning,
 			kBendStateHigh
 		};
-		const float freqRampStartIdx = 0.7;
-		const float embPeakIdx = freqRampStartIdx;
+		const float embPeakIdx = 0.7;
 		const float embStopIdx = 0.9;
 		const float embClip = 1.2;
 		const float bendStateHighToLowThreshold = 0.6;
@@ -195,8 +194,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				idx = 0;
 			float freq, emb;
 			getEmbFreq(bendRange, idx, freq, emb);
-			bendFreq = bendRange * (idx < freqRampStartIdx ? 0 
-				: (idx - freqRampStartIdx)/(1.f - freqRampStartIdx) * idx);
 			float embNormalized = idx < embPeakIdx ?
 				idx/embPeakIdx : (embStopIdx-idx)/(embStopIdx - embPeakIdx);
 			embNormalized *= embClip;
@@ -211,7 +208,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				if(kBendStateLow == bendState || kBendStateLow2 == bendState)
 				{
 					bendState = kBendStateTransitioning;
-					embNormalized = sqrtf(embNormalized);
 					transitionStartEmb = emb;
 					transitionStartFreq = freq;
 					transitionStartIdx = idx;
@@ -225,7 +221,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				if(kBendStateTransitioning == bendState)
 				{
 					bendState = kBendStateLow2;
-					embNormalized = sqrtf(embNormalized);
 					lowStartEmb = bendEmbouchureOffset;
 					lowStartIdx = idx;
 					if(lowStartIdx >= 0.95)
@@ -246,10 +241,9 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				bendEmbouchureOffset = emb;
 				bendFreq = freq;
 			} else if(kBendStateLow2 == bendState) {
-				embNormalized = sqrtf(embNormalized);
 				bendEmbouchureOffset = map(idx, lowStartIdx, 1, lowStartEmb, 0);
 				bendEmbouchureOffset = constrain(bendEmbouchureOffset, -0.8, 1);
-				bendFreq = freq;
+				bendFreq = freq; // TODO: replace with line
 			} else if(kBendStateTransitioning == bendState) {
 				// keep ramping the embouchure, till we get to the high octave
 				float transitionMaxEmbIdx = 0.97;
@@ -271,6 +265,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			}
 		}
 		if (kBendStateHigh == bendState) {
+			bendFreq = keyboardState.getBend();
 			bendStateHighKeyInitialPos = bendStateHighKeyInitialPos < buffer[bendStateHighKey] ? buffer[bendStateHighKey] : bendStateHighKeyInitialPos;
 			bendEmbouchureOffset = map(buffer[bendStateHighKey], bendStateHighKeyInitialPos, bendStateHighToLowThreshold, 1, 0);
 			bendEmbouchureOffset = constrain(bendEmbouchureOffset, 0, 1);
