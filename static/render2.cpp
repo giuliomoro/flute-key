@@ -158,13 +158,13 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			kBendStateTransitioning,
 			kBendStateHigh
 		};
-		const float maxEmbouchure = 0.60;
-		const float minEmbouchure = -0.28;
 		const float freqRampStartIdx = 0.7;
 		const float embPeakIdx = freqRampStartIdx;
 		const float embStopIdx = 0.9;
 		const float embClip = 1.2;
 		const float bendStateHighToLowThreshold = 0.6;
+		const float leakyAlpha = 0.99;
+		const float kLeakyLowToTransThreshold = 0.95;
 
 		static float transitioningEmbouchureOffset = 0;
 		static float transitionStartEmb;
@@ -174,6 +174,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		static float lowStartIdx;
 		static int bendStateHighKey;
 		static float bendStateHighKeyInitialPos;
+		static float embNormLeaky = 0;
 		if(kBendStateHigh == bendState)
 		{
 			if(buffer[bendStateHighKey] < bendStateHighToLowThreshold)
@@ -185,17 +186,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			}
 		}
 
-		float leakyAlpha = 0.99;
-		float kLeakyLowToTransThreshold = 0.95;
-		static float embNormLeaky = 0;
 		float bendRange = keyboardState.getBendRange(); //positive (bending up) or negative (bending down)
-		//if(std::abs(bendRange) < 0.05) {
-			//bendEmbouchureOffset = 0;
-			//lowStartEmb = 0;
-			//lowStartIdx = 0;
-		//} else {
 		{
-			float embouchureRange = bendRange > 0 ? maxEmbouchure : minEmbouchure;
 			//rt_printf("bendRange: %f keyboardState.getBend(): %f\n", bendRange, keyboardState.getBend());
 			if(bendRange)
 				idx = keyboardState.getBend() / bendRange; // normalized current bend, always positive
@@ -220,7 +212,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				{
 					bendState = kBendStateTransitioning;
 					embNormalized = sqrtf(embNormalized);
-					//bendEmbouchureOffset = embNormalized * embouchureRange;
 					transitionStartEmb = emb;
 					transitionStartFreq = freq;
 					transitionStartIdx = idx;
@@ -256,7 +247,6 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				bendFreq = freq;
 			} else if(kBendStateLow2 == bendState) {
 				embNormalized = sqrtf(embNormalized);
-				bendEmbouchureOffset = embNormalized * embouchureRange;
 				bendEmbouchureOffset = map(idx, lowStartIdx, 1, lowStartEmb, 0);
 				bendEmbouchureOffset = constrain(bendEmbouchureOffset, -0.8, 1);
 				bendFreq = freq;
