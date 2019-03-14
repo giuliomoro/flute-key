@@ -175,23 +175,32 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		// improved bending, with embouchure
 		enum {
 			kBendStateLow,
-			kBendStateLow2,
 			kBendStateTransitioning,
+			kBendStatePost, // a smoothing state from Transitioning to Low
 			kBendStateHigh
 		};
+
+		typedef struct {
+			float idx;
+			float freq;
+			float emb;
+		} InitialState;
+		#define STORE_STATE(state) state.idx = idx; state.freq = bendFreq; state.emb = bendEmbouchureOffset;\
+				rt_fprintf(stderr, "     idx: %.4f, freq: %.4f, emb: %.4f\n", state.idx, state.freq, state.emb)
+
 		const float embPeakIdx = 0.7;
 		const float embStopIdx = 0.9;
 		const float embClip = 1.2;
 		const float bendStateHighToLowThreshold = 0.6;
 		const float leakyAlpha = 0.99;
 		const float kLeakyLowToTransThreshold = 0.95;
+		const float transitionMaxIdx = 0.97;
+		const float postToLowRange = 0.2;
 
-		static float transitioningEmbouchureOffset = 0;
-		static float transitionStartEmb;
-		static float transitionStartFreq;
-		static float transitionStartIdx;
-		static float lowStartEmb;
-		static float lowStartIdx;
+		static InitialState trans;
+		static InitialState post;
+		static InitialState high;
+
 		static int bendStateHighKey;
 		static float bendStateHighKeyInitialPos;
 		static float embNormLeaky = 0;
@@ -201,21 +210,20 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			{
 				bendState = kBendStateLow;
 				rt_fprintf(stderr, "%d bendState reset to low\n", count);
-				lowStartEmb = 0;
-				lowStartIdx = 0;
 			}
 		}
 
 		float bendRange = keyboardState.getBendRange(); //positive (bending up) or negative (bending down)
+		float gTargetFreq = 0;
+		float gTargetEmb = 0;
+		float embNormalized;
 		{
 			//rt_printf("bendRange: %f keyboardState.getBend(): %f\n", bendRange, keyboardState.getBend());
 			if(bendRange)
 				idx = keyboardState.getBend() / bendRange; // normalized current bend, always positive
 			else
 				idx = 0;
-			float freq, emb;
-			getEmbFreq(bendRange, idx, freq, emb);
-			float embNormalized = idx < embPeakIdx ?
+			 embNormalized = idx < embPeakIdx ?
 				idx/embPeakIdx : (embStopIdx-idx)/(embStopIdx - embPeakIdx);
 			embNormalized *= embClip;
 			embNormalized = embNormalized < 0 ? 0 : embNormalized;
@@ -226,71 +234,80 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 				//rt_printf("%d_ leaky: %.5f\n", count, embNormLeaky);
 			if(embNormLeaky > kLeakyLowToTransThreshold)
 			{
-				if(kBendStateLow == bendState || kBendStateLow2 == bendState)
+				if(kBendStateLow == bendState || kBendStatePost == bendState)
 				{
+					rt_fprintf(stderr, "%d bendState from _%s_ %d to transitioning\n", count, (bendState == kBendStateLow ? "low" : "post"));
 					bendState = kBendStateTransitioning;
-					transitionStartEmb = emb;
-					transitionStartFreq = freq;
-					transitionStartIdx = idx;
-
-					rt_fprintf(stderr, "%d bendState from low%s to transitioning\n", count, bendState == kBendStateLow ? "" : "2");
-					rt_fprintf(stderr, "    transitionStartEmb: %.4f, transitionStartIdx: %.4f\n", transitionStartEmb, transitionStartIdx);
+					STORE_STATE(trans);
 				}
 			} else
 			if(embNormLeaky < 0.3)
 			{
 				if(kBendStateTransitioning == bendState)
 				{
-					bendState = kBendStateLow2;
-					lowStartEmb = bendEmbouchureOffset;
-					lowStartIdx = idx;
-					if(lowStartIdx >= 0.95)
-						lowStartEmb = 1; // make it 0 for more fun
-						
-					rt_fprintf(stderr, "%d bendState from transitioning to low2\n", count);
-					rt_fprintf(stderr, "     lowStartEmb: %.4f, lowStartIdx: %.4f\n", lowStartEmb, lowStartIdx);
+					bendState = kBendStatePost;
+					rt_fprintf(stderr, "%d bendState from transitioning to post\n", count);
+					STORE_STATE(post);
 				}
 			}
-			if(kBendStateLow2 == bendState && idx < 0.03)
+			if(kBendStatePost == bendState)
 			{
-				bendState = kBendStateLow;
-				rt_fprintf(stderr, "%d bendState from low2 to low\n", count);
+				if(idx < 0.03 || std::abs(idx - post.idx) > postToLowRange)
+				{
+					bendState = kBendStateLow;
+					rt_fprintf(stderr, "%d bendState from post to low\n", count);
+				}
 			}
+			// only allow StateHigh when bending up
+			if(kBendStateTransitioning == bendState && idx > transitionMaxIdx && bendRange > 0)
+			{
+				bendState = kBendStateHigh;
+				bendStateHighKey = keyboardState.getOtherKey();
+				bendStateHighKeyInitialPos = buffer[bendStateHighKey];
+				rt_fprintf(stderr, "%d bendState from transitioning to high (on %d)\n", count, bendStateHighKey);
+				STORE_STATE(high);
+			}
+			//TODO: transition to low also when changing key
 
 			if(kBendStateLow == bendState)
 			{
+				float freq, emb;
+				getEmbFreq(bendRange, idx, freq, emb);
 				bendEmbouchureOffset = emb;
 				bendFreq = freq;
-			} else if(kBendStateLow2 == bendState) {
-				bendEmbouchureOffset = map(idx, lowStartIdx, 1, lowStartEmb, 0);
-				bendEmbouchureOffset = constrain(bendEmbouchureOffset, -0.8, 1);
-				bendFreq = freq; // TODO: replace with line
+			} else if(kBendStatePost == bendState) {
+				// target the equivalent StateLow position located at ± postToLowRange
+				float targetFreq, targetEmb;
+				float lowRefIdx = idx > post.idx ? post.idx + postToLowRange : post.idx - postToLowRange;
+				getEmbFreq(bendRange, lowRefIdx, targetFreq, targetEmb);
+				gTargetFreq = targetFreq;
+				gTargetEmb = targetEmb;
+				bendEmbouchureOffset = map(idx, post.idx, lowRefIdx, post.emb, targetEmb);
+				bendFreq = map(idx, post.idx, lowRefIdx, post.freq, targetFreq);
 			} else if(kBendStateTransitioning == bendState) {
-				// keep ramping the embouchure, till we get to the high octave
-				float transitionMaxEmbIdx = 0.97;
-				bendFreq = transitionStartFreq;
-				//TODO: ramp down the bendFreq
-				transitioningEmbouchureOffset = map(idx, transitionStartIdx, transitionMaxEmbIdx, transitionStartEmb, bendRange > 0 ? 1 : -0.995);
-				transitioningEmbouchureOffset = constrain(transitioningEmbouchureOffset, -1, 1);
-
-				// only allow StateHigh when bending up
-				if(idx > transitionMaxEmbIdx && bendRange > 0)
-				{
-					transitioningEmbouchureOffset = 1;
-					bendState = kBendStateHigh;
-					bendStateHighKey = keyboardState.getOtherKey();
-					bendStateHighKeyInitialPos = buffer[bendStateHighKey];
-					rt_fprintf(stderr, "%d bendState from transitioning to high (on %d)\n", count, bendStateHighKey);
-				}
-				bendEmbouchureOffset = transitioningEmbouchureOffset;
+				// keep ramping the embouchure till we get to the high octave
+				bendEmbouchureOffset = map(idx, trans.idx, transitionMaxIdx, trans.emb, bendRange > 0 ? 1 : -0.995);
+				// also ramp the frequency to complete the bend
+				bendFreq = map(idx, trans.idx, transitionMaxIdx, trans.freq, bendRange);
 			}
-		}
-		if (kBendStateHigh == bendState) {
-			bendFreq = keyboardState.getBend();
-			bendStateHighKeyInitialPos = bendStateHighKeyInitialPos < buffer[bendStateHighKey] ? buffer[bendStateHighKey] : bendStateHighKeyInitialPos;
-			bendEmbouchureOffset = map(buffer[bendStateHighKey], bendStateHighKeyInitialPos, bendStateHighToLowThreshold, 1, 0);
-			bendEmbouchureOffset = constrain(bendEmbouchureOffset, 0, 1);
-			highPressure = true;
+			if (kBendStateHigh == bendState) {
+				bendFreq = keyboardState.getBend();
+				bendStateHighKeyInitialPos = bendStateHighKeyInitialPos < buffer[bendStateHighKey] ? buffer[bendStateHighKey] : bendStateHighKeyInitialPos;
+				bendEmbouchureOffset = map(buffer[bendStateHighKey], bendStateHighKeyInitialPos, bendStateHighToLowThreshold, 1, 0);
+				bendEmbouchureOffset = constrain(bendEmbouchureOffset, 0, 1);
+				highPressure = true;
+			}
+			if(0)
+			scope.log(
+				bendEmbouchureOffset, // red
+				bendFreq/bendRange, // blue
+				bendState / 4.f - 0.99, // green
+				embNormLeaky-1, // pink
+				idx - 1, // light blue
+				embNormalized - 1, // fuchsia
+				gTargetEmb, // red
+				gTargetFreq/bendRange // blue
+			);
 		}
 	}
 	const float posThreshold = 0.13; // ignore values below this
@@ -428,7 +445,7 @@ bool setup2(BelaContext *context, void *userData)
 	}
 #endif /* FILE_PLAYBACK */
 #ifdef SCOPE
-	scope.setup(2, 44100);
+	scope.setup(2, context->audioSampleRate);
 #endif /* SCOPE */
 #ifdef SCANNER
 	printf("Setting up scanner\n");
