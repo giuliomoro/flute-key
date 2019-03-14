@@ -151,10 +151,11 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		}
 		count++;
 	}
-	keyboardState.setPositionCrossFadeDip(gAnalogIn1Read * 4.f);
+	//keyboardState.setPositionCrossFadeDip(gAnalogIn1Read * 4.f);
+	keyboardState.setPositionCrossFadeDip(0.7f * 4.f);
 	keyboardState.render(buffer, keyPositionTrackers, firstKey, lastKey);
 
-	float bendFreq = 0;
+	static float bendFreq = 0;
 	static float bendEmbouchureOffset = 0;
 	float idx = 0;
 	bool highPressure = false;
@@ -311,7 +312,8 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	}
 
 	float pressure = keyboardState.getPosition();
-	float expo = gAnalogIn0Read * 2.f + 0.5;
+	//float expo = gAnalogIn0Read * 2.f + 0.5;
+	float expo = 0.146f * 2.f + 0.5f;
 	float afterTouchThreshold = 1.03;
 	if(pressure <= 0)
 		pressure = 0;
