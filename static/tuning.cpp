@@ -21,12 +21,12 @@ static TuningData gTuning2Up[] = {
 {1.1, 0, 60.39},
 {1.15, 0, 60.56},
 {1.2, 0, 60.71},
-{1.25, 0.5, 60.86},
+{1.25, 0, 60.86},
 {1.3, 0, 61.0},
 {1.25, 0.3, 61.16},
 {1.2, 0.62, 61.33},
 {1.15, 0.95, 61.5},
-{1.1,  1.28, 61.66},
+{1.1, 1.28, 61.66},
 {1.05, 1.64, 61.83},
 {1, 2, 62.0}
 };
@@ -36,7 +36,7 @@ static TuningData gTuning3Up[] = {
 {1.1, 0, 60.39},
 {1.15, 0, 60.56},
 {1.2, 0, 60.71},
-{1.25, 0.5, 60.86},
+{1.25, 0, 60.86},
 {1.3, 0, 61.0},
 {1.35, 0, 61.13},
 {1.4, 0, 61.25},
@@ -63,7 +63,7 @@ static TuningData gTuning4Up[] = {
 {1.1, 0, 60.39},
 {1.15, 0, 60.56},
 {1.2, 0, 60.71},
-{1.25, 0.5, 60.86},
+{1.25, 0, 60.86},
 {1.3, 0, 61.0},
 {1.35, 0, 61.13},
 {1.4, 0, 61.25},
@@ -146,6 +146,8 @@ void getEmbFreq(int range, float idx, float& freq, float& emb)
 	int sizeDen = sizeof(TuningData);
 	TuningData* buf = nullptr;
 	int nrow = 0;
+	// clip to a sane value
+	idx = idx > 1 ? 1 : idx < 0 ? 0 : idx;
 	switch (range){
 		case 1:
 			ASSIGN_TUNING(gTuning1Up);
@@ -186,8 +188,6 @@ void getEmbFreq(int range, float idx, float& freq, float& emb)
 	// linearly interpolate between the values
 	freq = buf[iint].freq * (1.f - ifrac) + buf[iint+1].freq * ifrac;
 	emb = buf[iint].emb * (1.f - ifrac) + buf[iint+1].emb * ifrac;
-	//rt_printf("nrow: %d, idx: %f, i: %f, iint: %d, ifrac: %f, emb: %f, freq: %f\n", 
-		//nrow, idx, i, iint, ifrac, emb, freq);
 	emb -= 1;
 }
 
