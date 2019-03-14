@@ -101,7 +101,7 @@ void Bela_userSettings2(BelaInitSettings* settings)
 	settings->pruNumber = 0;	
 	settings->useDigital = 0;
 }
-
+//#define AUTOPLAY
 void postCallback(void* arg, float* buffer, unsigned int length){
 	//Keys* keys = (Keys*)arg;
 	int firstKey = gKeyOffset;
@@ -117,6 +117,26 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		{
 			// INVERTING INPUTS
 			buffer[n] = 1.f - buffer[n];
+#ifdef AUTOPLAY
+			// ramp up the primary key so that KeyPositionTracker gets the
+			// state transitions
+			buffer[n] = 0;
+			if(50 == n)
+			{
+				if(count > 100)
+					buffer[n] = (count - 100) / 200.f;
+				// simulate rebound at key-bottom
+				if(buffer[n] > 1)
+					buffer[n] = 0.95;
+			}
+			const int period = 2000;
+			if(n == 52 && count > 150)
+			{
+				int periodIdx = (count - 150) % period;
+				float keyPos = (periodIdx > period / 2 ? period - periodIdx : periodIdx)/(float)(period / 2);
+				buffer[n] = keyPos * 0.8f;
+			}
+#endif /* AUTOPLAY */
 		}
 		keyBuffers.postCallback(buffer, length, count);
 		for(unsigned int n = 0; n < length; ++n)
