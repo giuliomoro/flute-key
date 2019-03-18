@@ -15,7 +15,7 @@ extern float gEmbRatio;
 
 // communicate between keys thread and render
 float gPercFlag;
-float gAnalogIn0Read;
+float gAnalogIn0Smoothed;
 float gAnalogIn1Read;
 float gAnalogIn2Read;
 uint64_t gTimestamp;
@@ -368,11 +368,14 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		isSmoothingPosition = true;
 	}
 
+	static float tempPos;
 	if(isSmoothingPosition) {
-		 gPos = gPos * clickSmoothAlpha + candidatePressure * (1.f - clickSmoothAlpha);
+		 tempPos = tempPos * clickSmoothAlpha + candidatePressure * (1.f - clickSmoothAlpha);
 	} else {
-		gPos = candidatePressure;
+		tempPos = candidatePressure;
 	}
+	float pedalPressure = 0.85f + (gAnalogIn0Smoothed * 0.15f);
+	float pedalGain = 0.2f + gAnalogIn0Smoothed * gAnalogIn0Smoothed * 0.8f;
 	//gPos = 1.2; // use this to ignore the above and test tuning
 
 	// handle percussiveness
@@ -405,7 +408,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	gEmbRatio = 1.f + bendEmbouchureOffset;
 	gGate = 1;
 	const float maxGain = 0.2;
-	gGain = maxGain * gain;
+	float tempGain = maxGain * gain;
 	gKey = fixTuning(keyboardState.getKey() + bendFreq + 12, gPos);
 	// higher notes don't speak with too much pressure in one go, for high
 	// nonLinearity values. Therefore, we adjust nonLinearity with the
@@ -413,10 +416,12 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	gNonLinearity = getNonLinearity(gKey, gEmbRatio);
 
 	#ifdef LOGGING
-	float logs[] = {(float)gTimestamp, (float)count, gKey, gPos, gNonLinearity, gGate, gPerc, gGain, gEmbRatio, (float)bendState, gAnalogIn0Read, gAnalogIn1Read, gAnalogIn2Read};
+	float logs[] = {(float)gTimestamp, (float)count, gKey, tempPos, gNonLinearity, gGate, gPerc, tempGain, gEmbRatio, (float)bendState, gAnalogIn0Smoothed};
 	gSensorFile.log(logs, sizeof(logs)/sizeof(float));
 	gSensorFile.log(buffer + firstKey, lastKey - firstKey + 1);
 	#endif 
+	gGain = tempGain * pedalGain;
+	gPos = tempPos * pedalPressure;
 	return;
 }
 
@@ -498,9 +503,13 @@ unsigned int gSampleCount = 0;
 DR dr(44100);
 void render2(BelaContext *context, void *userData)
 {
-	gAnalogIn0Read = analogReadNI(context, 0, 0);
 	gAnalogIn1Read = analogReadNI(context, 0, 1);
 	gAnalogIn2Read = analogReadNI(context, 0, 2);
+	const float analogIn0Alpha = 0.995;
+	for(unsigned int n = 0; n < context->analogFrames; ++n)
+	{
+		gAnalogIn0Smoothed = analogReadNI(context, n, 0) * (1.f - analogIn0Alpha) + analogIn0Alpha * gAnalogIn0Smoothed;
+	}
 	float* audioIn = (float*)context->audioIn;
 	for(unsigned int n = 0; n < context->audioFrames; ++n)
 	{
