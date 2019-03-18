@@ -184,8 +184,11 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			float idx;
 			float freq;
 			float emb;
+			int key;
+			int otherKey;
 		} InitialState;
 		#define STORE_STATE(state) state.idx = idx; state.freq = bendFreq; state.emb = bendEmbouchureOffset;\
+				state.otherKey = keyboardState.getOtherKey(); state.key = keyboardState.getKey();\
 				rt_fprintf(stderr, "     idx: %.4f, freq: %.4f, emb: %.4f\n", state.idx, state.freq, state.emb)
 
 		const float embPeakIdx = 0.7;
@@ -200,6 +203,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		static InitialState trans;
 		static InitialState post;
 		static InitialState high;
+		static float lowTargetIdx;
 
 		static int bendStateHighKey;
 		static float bendStateHighKeyInitialPos;
@@ -252,7 +256,11 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			}
 			if(kBendStatePost == bendState)
 			{
-				if(idx < 0.03 || std::abs(idx - post.idx) > postToLowRange)
+				if(idx < 0.03
+					|| (lowTargetIdx > post.idx && idx > lowTargetIdx)
+					|| (lowTargetIdx < post.idx && idx < lowTargetIdx)
+					|| (post.otherKey != keyboardState.getOtherKey() && post.key != keyboardState.getKey())
+				)
 				{
 					bendState = kBendStateLow;
 					rt_fprintf(stderr, "%d bendState from post to low\n", count);
@@ -278,12 +286,13 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			} else if(kBendStatePost == bendState) {
 				// target the equivalent StateLow position located at ± postToLowRange
 				float targetFreq, targetEmb;
-				float lowRefIdx = idx > post.idx ? post.idx + postToLowRange : post.idx - postToLowRange;
-				getEmbFreq(bendRange, lowRefIdx, targetFreq, targetEmb);
+				lowTargetIdx = idx > post.idx ? post.idx + postToLowRange : post.idx - postToLowRange;
+				lowTargetIdx = lowTargetIdx > 0.95 ? 0.95 : lowTargetIdx < 0.05 ? 0.05 : lowTargetIdx;
+				getEmbFreq(bendRange, lowTargetIdx, targetFreq, targetEmb);
 				gTargetFreq = targetFreq;
 				gTargetEmb = targetEmb;
-				bendEmbouchureOffset = map(idx, post.idx, lowRefIdx, post.emb, targetEmb);
-				bendFreq = map(idx, post.idx, lowRefIdx, post.freq, targetFreq);
+				bendEmbouchureOffset = map(idx, post.idx, lowTargetIdx, post.emb, targetEmb);
+				bendFreq = map(idx, post.idx, lowTargetIdx, post.freq, targetFreq);
 			} else if(kBendStateTransitioning == bendState) {
 				// keep ramping the embouchure till we get to the high octave
 				bendEmbouchureOffset = map(idx, trans.idx, transitionMaxIdx, trans.emb, bendRange > 0 ? 1 : -0.995);
