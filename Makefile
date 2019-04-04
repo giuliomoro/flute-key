@@ -1,5 +1,5 @@
 DSP_FILE=vfl.dsp
-BELA_COMMAND_ARGS=-H 0
+BELA_COMMAND_ARGS=-H 6
 BELA_LDLIBS=-lHTTPDFaust -lkeys -L/root/spi-pru
 BELA_CPPFLAGS=-I/root/spi-pru -std=c++14
 ARCHFILE=faust/architecture/bela.cpp 
