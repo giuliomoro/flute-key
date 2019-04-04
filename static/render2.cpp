@@ -425,7 +425,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	gNonLinearity = getNonLinearity(gKey, gEmbRatio);
 
 	#ifdef LOGGING
-	float logs[] = {(float)gTimestamp, (float)count, gKey, tempPos, gNonLinearity, gGate, gPerc, tempGain, gEmbRatio, (float)bendState, gAnalogIn0Smoothed};
+	float logs[] = {(float)gTimestamp, (float)count, gKey, tempPos, gNonLinearity, gGate, gPerc, tempGain, gEmbRatio, (float)bendState, gAnalogIn0Smoothed, keyboardState.getPosition()};
 	gSensorFile.log(logs, sizeof(logs)/sizeof(float));
 	gSensorFile.log(buffer + firstKey, lastKey - firstKey + 1);
 	#endif 
