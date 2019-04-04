@@ -1,4 +1,17 @@
+#ifndef TUNING_STANDALONE
 extern "C" int rt_printf(const char *format, ...);
+#else
+#include <stdio.h>
+#define rt_printf printf
+void getEmbFreq(int range, float idx, float& freq, float& emb);
+int main()
+{
+	float freq, emb;
+	getEmbFreq(2, 0.99, freq, emb);
+	printf("freq %f, emb %f\n", freq, emb);
+	return 0;
+}
+#endif
 
 typedef struct {
 	float emb;
