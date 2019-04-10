@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include "KeyboardState.h"
+#include "command-line-data.h"
 
 // communicate to faust
 extern float gKey;
@@ -23,11 +24,14 @@ uint64_t gTimestamp;
 #define SCOPE
 #define SCANNER
 #define FILE_PLAYBACK
-//#define LOGGING
+#define LOGGING
 
 #include "tuning.h"
 #ifdef LOGGING
+#include <chrono>
+#include <iomanip>
 #include <WriteFile.h>
+int gShouldLog;
 WriteFile gSensorFile;
 WriteFile gAudioFile;
 #endif /* LOGGING */
@@ -424,11 +428,14 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	// frequency.
 	gNonLinearity = getNonLinearity(gKey, gEmbRatio);
 
-	#ifdef LOGGING
-	float logs[] = {(float)gTimestamp, (float)count, gKey, tempPos, gNonLinearity, gGate, gPerc, tempGain, gEmbRatio, (float)bendState, gAnalogIn0Smoothed, keyboardState.getPosition()};
-	gSensorFile.log(logs, sizeof(logs)/sizeof(float));
-	gSensorFile.log(buffer + firstKey, lastKey - firstKey + 1);
-	#endif 
+#ifdef LOGGING
+	if(gShouldLog)
+	{
+		float logs[] = {(float)gTimestamp, (float)count, gKey, tempPos, gNonLinearity, gGate, gPerc, tempGain, gEmbRatio, (float)bendState, gAnalogIn0Smoothed, keyboardState.getPosition()};
+		gSensorFile.log(logs, sizeof(logs)/sizeof(float));
+		gSensorFile.log(buffer + firstKey, lastKey - firstKey + 1);
+	}
+#endif /* LOGGING */
 	gGain = tempGain * pedalGain;
 	gPos = tempPos * pedalPressure;
 	return;
@@ -436,11 +443,30 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 bool setup2(BelaContext *context, void *userData)
 {
-#ifdef LOGGING
-	  gAudioFile.init("/root/audio_log.bin");
-	  gAudioFile.setFileType(kBinary);
-	  gSensorFile.init("/root/sensor_log.bin");
-	  gSensorFile.setFileType(kBinary);
+#ifdef LOGGING /* LOGGING */
+	struct command_line_data_t* command_line_data = (struct command_line_data_t*)userData;
+	gShouldLog = !command_line_data->dont_log;
+	if(gShouldLog) {
+		const char* path;
+		if(command_line_data->path)
+			path = command_line_data->path;
+		else
+			path = "/mnt/storage/";
+
+		auto time = std::time(nullptr);
+		char timestr[500];
+		std::strftime(timestr, sizeof(timestr), "%Y-%m-%d-%H_%M_%S", std::localtime(&time));
+		char filestr[1000];
+		sprintf(filestr, "%s/audio_log-%s.bin", path, timestr);
+		if(gAudioFile.setup(filestr))
+			return false;
+		gAudioFile.setFileType(kBinary);
+
+		sprintf(filestr, "%s/analog_log-%s.bin", path, timestr);
+		if(gSensorFile.setup(filestr))
+			return false;
+		gSensorFile.setFileType(kBinary);
+	}
 #endif /* LOGGING */
 
 #ifdef FILE_PLAYBACK
@@ -558,10 +584,13 @@ void renderPost(BelaContext *context, void *userData)
 		scope.log(context->audioOut[context->audioFrames * ch + f], gPos);
 	}
 #ifdef LOGGING
-	float timestamp = gTimestamp;
-	gAudioFile.log(&timestamp, 1);
-	gAudioFile.log(context->audioOut, context->audioFrames);
-#endif	
+	if(gShouldLog)
+	{
+		float timestamp = gTimestamp;
+		gAudioFile.log(&timestamp, 1);
+		gAudioFile.log(context->audioOut, context->audioFrames);
+	}
+#endif /* LOGGING */
 	gTimestamp += context->audioFrames;
 }
 
