@@ -25,8 +25,13 @@ uint64_t gTimestamp;
 #define SCANNER
 #define FILE_PLAYBACK
 #define LOGGING
+#define MIDI
 
 #include "tuning.h"
+#ifdef MIDI
+#include <Midi.h>
+Midi gMidi;
+#endif /* MIDI */
 #ifdef LOGGING
 #include <chrono>
 #include <iomanip>
@@ -155,8 +160,75 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		}
 		count++;
 	}
-	//keyboardState.setPositionCrossFadeDip(gAnalogIn1Read * 4.f);
-	keyboardState.setPositionCrossFadeDip(0.7f * 4.f);
+	enum {
+		kCrossFadeDip,
+		kExpo,
+		kNumCcs,
+	};
+	const int kControllerDefault = 64;
+	static int midiParams[kNumCcs] = {-1};
+	if(-1 == midiParams[0])
+	{
+		for(unsigned int n = 0; n < kNumCcs; ++n)
+			midiParams[n] = kControllerDefault;
+	}
+
+#ifdef MIDI
+	enum {
+		kCcCrossFadeDip = 16,
+		kCcExpo = 20,
+	};
+	const int kNoteReset = 3;
+	while(gMidi.getParser()->numAvailableMessages())
+	{
+		MidiChannelMessage msg = gMidi.getParser()->getNextChannelMessage();
+		MidiMessageType type = msg.getType();
+		if(kmmControlChange == type)
+		{
+			int cc = msg.getDataByte(0);
+			int val = msg.getDataByte(1);
+			rt_printf("On Channel: %d, controlchange %d, value %d\n", msg.getChannel(), cc, val);
+			switch (cc) {
+			case kCcCrossFadeDip:
+				midiParams[kCrossFadeDip] = val;
+				rt_printf("dip: %d\n", val);
+				break;
+			case kCcExpo:
+				rt_printf("expo: %d\n", val);
+				midiParams[kExpo] = val;
+				break;
+			default:
+				break;
+			}
+		} else if(kmmNoteOn == type) {
+			int note = msg.getDataByte(0);
+			int vel = msg.getDataByte(1);
+			rt_printf("On Channel: %d, note %d, velocity %d\n", msg.getChannel(), note, vel);
+			if(kNoteReset == note && vel)
+			{
+				//reset all params:
+				for(unsigned int n = 0; n < kNumCcs; ++n)
+					midiParams[n] = 64;
+			}
+		}
+	}
+	bool areControllersDefault = true;
+	for(unsigned int n = 0; n < kNumCcs; ++n)
+	{
+		if(kControllerDefault != midiParams[n])
+		{
+			areControllersDefault = false;
+			break;
+		}
+	}
+	if(areControllersDefault)
+		gMidi.writeNoteOn(0, kNoteReset, 0);
+	else
+		gMidi.writeNoteOn(0, kNoteReset, 127);
+#endif /* MIDI */
+	float crossFadeDip = 0.7f * 4.f * 2.f * midiParams[kCrossFadeDip]/127.f;
+
+	keyboardState.setPositionCrossFadeDip(crossFadeDip);
 	keyboardState.render(buffer, keyPositionTrackers, firstKey, lastKey);
 
 	static float bendFreq = 0;
@@ -343,7 +415,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 	float pressure = keyboardState.getPosition();
 	//float expo = gAnalogIn0Read * 2.f + 0.5;
-	float expo = 0.146f * 2.f + 0.5f;
+	float expo = 0.146f * 2.f * 2.f * midiParams[kExpo]/127.f + 0.5f;
 	float afterTouchThreshold = 1.03;
 	if(pressure <= 0)
 		pressure = 0;
@@ -443,6 +515,12 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 
 bool setup2(BelaContext *context, void *userData)
 {
+#ifdef MIDI
+	char midiInterface[] = "hw:1,0,0";
+	gMidi.readFrom(midiInterface);
+	gMidi.writeTo(midiInterface);
+	gMidi.enableParser(true);
+#endif /* MIDI */
 #ifdef LOGGING /* LOGGING */
 	struct command_line_data_t* command_line_data = (struct command_line_data_t*)userData;
 	gShouldLog = !command_line_data->dont_log;
