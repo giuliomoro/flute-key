@@ -527,7 +527,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 #ifdef LOGGING
 	if(gShouldLog)
 	{
-		float logs[] = {(float)gTimestamp, (float)count, gKey, tempPos, gNonLinearity, gGate, gPerc, tempGain, gEmbRatio, (float)bendState, gAnalogIn0Smoothed, keyboardState.getPosition()};
+		float logs[] = {(float)gTimestamp, (float)count, gKey, tempPos, gNonLinearity, gGate, gPerc, tempGain, gEmbRatio, (float)bendState, gAnalogIn0Smoothed, keyboardState.getPosition(), crossFadeDip, expo};
 		gSensorFile.log(logs, sizeof(logs)/sizeof(float));
 		gSensorFile.log(buffer + firstKey, lastKey - firstKey + 1);
 	}
@@ -564,7 +564,7 @@ bool setup2(BelaContext *context, void *userData)
 			return false;
 		gAudioFile.setFileType(kBinary);
 
-		sprintf(filestr, "%s/analog_log-%s.bin", path, timestr);
+		sprintf(filestr, "%s/sensor_log-%s.bin", path, timestr);
 		if(gSensorFile.init(filestr))
 			return false;
 		gSensorFile.setFileType(kBinary);
