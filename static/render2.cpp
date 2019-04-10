@@ -104,6 +104,25 @@ private:
 	float gain_;
 };
 
+static bool isWhiteKey(int key)
+{
+	key = key % 12;
+	switch(key)
+	{
+		case 0:
+		case 2:
+		case 4:
+		case 5:
+		case 7:
+		case 9:
+		case 11:
+			return true;
+			break;
+		default:
+			return false;
+	}
+}
+
 //#define SINGLE_KEY
 void Bela_userSettings2(BelaInitSettings* settings)
 {
@@ -416,13 +435,18 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	float pressure = keyboardState.getPosition();
 	//float expo = gAnalogIn0Read * 2.f + 0.5;
 	float expo = 0.146f * 2.f * 2.f * midiParams[kExpo]/127.f + 0.5f;
-	float afterTouchThreshold = 1.03;
+	float afterTouchThreshold = 1;
 	if(pressure <= 0)
 		pressure = 0;
 	else if(pressure <= afterTouchThreshold)
-		pressure = powf(pressure, expo); // some e
+		pressure = powf(pressure, expo);
 	else if(pressure > afterTouchThreshold)
-		pressure = powf(pressure, 4); // fixed curve for aftertouch, very steep
+	{
+		if(isWhiteKey(keyboardState.getKey()))
+			pressure = powf(pressure, 4);
+		else
+			pressure = powf(pressure, 6);
+	}
 	float candidatePressure = pressure * pressureScale;
 
 	if(candidatePressure < posThreshold)
@@ -536,12 +560,12 @@ bool setup2(BelaContext *context, void *userData)
 		std::strftime(timestr, sizeof(timestr), "%Y-%m-%d-%H_%M_%S", std::localtime(&time));
 		char filestr[1000];
 		sprintf(filestr, "%s/audio_log-%s.bin", path, timestr);
-		if(gAudioFile.setup(filestr))
+		if(gAudioFile.init(filestr))
 			return false;
 		gAudioFile.setFileType(kBinary);
 
 		sprintf(filestr, "%s/analog_log-%s.bin", path, timestr);
-		if(gSensorFile.setup(filestr))
+		if(gSensorFile.init(filestr))
 			return false;
 		gSensorFile.setFileType(kBinary);
 	}
