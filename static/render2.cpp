@@ -182,6 +182,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	enum {
 		kCrossFadeDip,
 		kExpo,
+		kAfter,
 		kNumCcs,
 	};
 	const int kControllerDefault = 64;
@@ -196,6 +197,7 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 	enum {
 		kCcCrossFadeDip = 16,
 		kCcExpo = 20,
+		kCcAfter = 24,
 	};
 	const int kNoteReset = 3;
 	while(gMidi.getParser()->numAvailableMessages())
@@ -215,6 +217,10 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 			case kCcExpo:
 				rt_printf("expo: %d\n", val);
 				midiParams[kExpo] = val;
+				break;
+			case kCcAfter:
+				rt_printf("after: %d\n", val);
+				midiParams[kAfter] = val;
 				break;
 			default:
 				break;
@@ -442,10 +448,11 @@ void postCallback(void* arg, float* buffer, unsigned int length){
 		pressure = powf(pressure, expo);
 	else if(pressure > afterTouchThreshold)
 	{
+		float after = midiParams[kAfter]/127.f * 4 + 2;
 		if(isWhiteKey(keyboardState.getKey()))
-			pressure = powf(pressure, 4);
+			pressure = powf(pressure, after);
 		else
-			pressure = powf(pressure, 6);
+			pressure = powf(pressure, after);
 	}
 	float candidatePressure = pressure * pressureScale;
 
@@ -542,7 +549,6 @@ bool setup2(BelaContext *context, void *userData)
 #ifdef MIDI
 	char midiInterface[] = "hw:1,0,0";
 	gMidi.readFrom(midiInterface);
-	gMidi.writeTo(midiInterface);
 	gMidi.enableParser(true);
 #endif /* MIDI */
 #ifdef LOGGING /* LOGGING */
